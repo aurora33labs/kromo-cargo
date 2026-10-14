@@ -1,0 +1,73 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Linux y Windows se compilan de forma cruzada desde Linux.
+          - os: ubuntu-latest
+            targets: linux-x64 linux-arm64 windows-x64
+          # macOS en su propio runner para firmar (ad-hoc) los binarios: Apple Silicon no ejecuta binarios sin firma.
+          - os: macos-latest
+            targets: darwin-x64 darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - name: Verifica que el tag coincide con la versión
+        run: |
+          VERSION=$(bun -p "require('./apps/cargo/package.json').version")
+          test "v$VERSION" = "$GITHUB_REF_NAME" || (echo "Tag $GITHUB_REF_NAME ≠ versión $VERSION" && exit 1)
+      - name: Compila
+        working-directory: apps/cargo
+        run: |
+          mkdir -p ../../out
+          for t in ${{ matrix.targets }}; do
+            ext=""; [ "${t%%-*}" = "windows" ] && ext=".exe"
+            bun build src/cli.ts --compile --minify --target=bun-$t --outfile ../../out/kromo-cargo-$t$ext
+            if [ "${t%%-*}" = "darwin" ]; then codesign --force --sign - ../../out/kromo-cargo-$t; fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.os }}
+          path: out/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: version.txt y checksums
+        working-directory: out
+        run: |
+          node -p "require('../apps/cargo/package.json').version" > version.txt
+          sha256sum kromo-cargo-* > checksums.txt
+          cat checksums.txt
+          cp ../LICENSE LICENSE.txt
+      # Procedencia firmada por GitHub: `gh attestation verify <binario> --repo aurora33labs/kromo-cargo`.
+      # Gratis en repos públicos; en privados requiere GitHub Enterprise Cloud.
+      - uses: actions/attest-build-provenance@v2
+        if: ${{ !github.event.repository.private }}
+        with:
+          subject-path: out/kromo-cargo-*
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

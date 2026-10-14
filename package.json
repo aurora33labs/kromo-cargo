@@ -1,0 +1,26 @@
+{
+  "name": "kromo-cargo-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "cd apps/cargo && bun run dev",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p .",
+    "build": "cd apps/cargo && bun run build",
+    "test:pg": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://kromo:kromo@127.0.0.1:55440/kromo} bun test",
+    "db:up": "docker compose up -d --wait"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "playwright": "1.58.0",
+    "typescript": "^5.9.0"
+  },
+  "license": "PolyForm-Shield-1.0.0",
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

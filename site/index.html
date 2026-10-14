@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kromo Cargo · tu tienda, operada por tu IA</title>
+  <meta name="description" content="Kromo Cargo: inventario y ventas para tienda física, gratis y en tu computadora. Se instala con un prompt y lo opera tu IA: Claude, Codex o Gemini." />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f5f3; --surface: #fcfcfb; --surface-2: #efeee9; --border: #e3e2de;
+      --text: #0b0b0b; --text-2: #52514e; --text-3: #7c7b76;
+      --accent: #2a78d6; --accent-hover: #1f66bd; --accent-soft: #e6f0fb; --ia: #5b3fc4; --ia-soft: #eeeafd;
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #2e2e2b;
+        --text: #fff; --text-2: #c3c2b7; --text-3: #8f8e86;
+        --accent: #3987e5; --accent-hover: #5598ea; --accent-soft: #1b2b40; --ia: #a596f2; --ia-soft: #26213f;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #2e2e2b;
+      --text: #fff; --text-2: #c3c2b7; --text-3: #8f8e86;
+      --accent: #3987e5; --accent-hover: #5598ea; --accent-soft: #1b2b40; --ia: #a596f2; --ia-soft: #26213f;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+    header { display: flex; align-items: center; gap: 10px; padding: 20px 0; }
+    .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+    header b { font-size: 17px; }
+    header .by { margin-left: auto; color: var(--text-3); font-size: 14px; }
+    .hero { padding: 48px 0 32px; display: grid; gap: 20px; max-width: 760px; }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; color: var(--ia); background: var(--ia-soft); padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; justify-self: start; }
+    h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.03em; margin: 0; }
+    .lead { font-size: 19px; color: var(--text-2); margin: 0; }
+    .prompt { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); }
+    .prompt-label { font-size: 13px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+    .prompt pre { margin: 0; white-space: pre-wrap; font: 15px/1.5 var(--mono); background: var(--surface-2); padding: 14px; border-radius: 10px; overflow-wrap: anywhere; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 600 16px var(--font); cursor: pointer; text-decoration: none; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { background: var(--accent-hover); }
+    .hint { color: var(--text-3); font-size: 14px; }
+    section { padding: 48px 0; }
+    h2 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 8px; }
+    .sub { color: var(--text-2); margin: 0 0 28px; max-width: 640px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: var(--text-2); font-size: 15px; }
+    .step { font: 700 13px var(--mono); color: var(--accent); margin-bottom: 8px; }
+    .chat { display: grid; gap: 10px; }
+    .msg { padding: 12px 14px; border-radius: 12px; max-width: 520px; font-size: 15px; }
+    .msg.yo { background: var(--accent); color: #fff; justify-self: end; border-bottom-right-radius: 4px; }
+    .msg.ia { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .msg.ia small { display: block; color: var(--ia); font-weight: 600; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    td, th { text-align: left; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    td.r, th.r { text-align: right; }
+    .biz { background: var(--text); color: var(--bg); border-radius: 20px; padding: 36px; display: grid; gap: 16px; }
+    .biz p, .biz li { color: color-mix(in srgb, var(--bg) 78%, transparent); }
+    .biz ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+    .biz .btn { justify-self: start; background: var(--bg); color: var(--text); border-color: var(--bg); }
+    details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; }
+    details + details { margin-top: 10px; }
+    summary { font-weight: 600; cursor: pointer; }
+    details p { color: var(--text-2); margin: 10px 0 0; }
+    code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
+    footer { padding: 40px 0; color: var(--text-3); font-size: 14px; border-top: 1px solid var(--border); margin-top: 32px; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .toast.on { opacity: 1; }
+    @media (max-width: 640px) { .biz { padding: 24px; } section { padding: 36px 0; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></div>
+      <b>Kromo Cargo</b>
+      <span class="by">una herramienta gratuita de Kromo, por Aurora33</span>
+    </header>
+
+    <div class="hero">
+      <span class="eyebrow">✦ App + IA, gratis y en tu computadora</span>
+      <h1>Tu tienda, operada por tu IA.</h1>
+      <p class="lead">Inventario, venta rápida, etiquetas QR y reportes para tu tienda física. Tus datos se quedan en tu compu, y Claude, Codex o Gemini lo manejan por ti.</p>
+      <div class="prompt">
+        <span class="prompt-label">Copia esto y pégalo en Claude Code, Codex o tu agente con terminal</span>
+        <pre id="prompt">Instala Kromo Cargo de Aurora33 siguiendo las instrucciones de https://kromo.aurora33.app/install/cargo.md. Antes de ejecutar cualquier comando, explícame qué hará y pídeme confirmación.</pre>
+        <div class="row">
+          <button class="btn primary" id="copiar">Copiar prompt</button>
+          <a class="btn" href="install/cargo.md">Ver qué hace el instalador</a>
+        </div>
+        <span class="hint">Tu IA descarga el programa, verifica que sea auténtico, lo conecta y te deja lista la app. Sin descargar repos ni configurar nada.</span>
+      </div>
+    </div>
+
+    <section>
+      <h2>Así funciona</h2>
+      <p class="sub">Una app para el mostrador y un servidor MCP para tu IA, sobre los mismos datos. Lo que hace uno, el otro lo ve en vivo.</p>
+      <div class="grid">
+        <div class="card"><div class="step">01</div><h3>Pegas el prompt</h3><p>Tu agente instala un solo programa y lo registra en Claude Code, Codex, Gemini CLI y Claude Desktop.</p></div>
+        <div class="card"><div class="step">02</div><h3>Abres la app</h3><p><code>kromo-cargo serve</code> abre la pantalla de mostrador: escaneas, cobras y das el cambio.</p></div>
+        <div class="card"><div class="step">03</div><h3>Le hablas a tu IA</h3><p>"¿Qué se me acaba?", "Llegaron 24 refrescos", "Sube 8% las bebidas". Todo queda en el historial y se puede deshacer.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Pregúntale lo que sea</h2>
+      <p class="sub">La IA usa herramientas reales del inventario: no inventa números.</p>
+      <div class="chat">
+        <div class="msg yo">¿Qué se me va a acabar esta semana? Arma el pedido por proveedor.</div>
+        <div class="msg ia"><small>✦ Claude · kromo-cargo</small>Son 5 productos. El más urgente es el queso panela (unos 3 días).
+          <table><tr><th>Proveedor</th><th>Producto</th><th class="r">Pedir</th></tr>
+            <tr><td>Lala</td><td>Queso panela 400 g</td><td class="r">9</td></tr>
+            <tr><td>Danone</td><td>Yogur fresa 1 kg</td><td class="r">9</td></tr>
+            <tr><td>Verde Valle</td><td>Arroz 1 kg</td><td class="r">12</td></tr></table>
+        </div>
+        <div class="msg yo">Sube 10% las botanas, redondeado al peso.</div>
+        <div class="msg ia"><small>✦ Claude · kromo-cargo</small>Esta es la vista previa: Cacahuates $18 → $20, Doritos $21 → $23 y Sabritas $19 → $21. ¿Lo aplico?</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Todo lo que una tiendita necesita</h2>
+      <div class="grid">
+        <div class="card"><h3>Venta rápida</h3><p>Lector de código de barras, "3*código" para varias piezas, efectivo con cálculo de cambio, tarjeta y transferencia.</p></div>
+        <div class="card"><h3>Inventario sin trampas</h3><p>Entradas, mermas y conteos con motivo. El stock es la suma de movimientos: nunca se borra nada.</p></div>
+        <div class="card"><h3>Etiquetas QR</h3><p>PDF listo para imprimir con QR o código de barras, nombre y precio.</p></div>
+        <div class="card"><h3>Reportes</h3><p>Ventas, utilidad estimada, lo que más se vende, lo que se acaba y el dinero detenido en anaquel.</p></div>
+        <div class="card"><h3>Importa tu Excel</h3><p>Trae tu catálogo de CSV o Excel. Reconoce columnas comunes y te muestra una vista previa antes de aplicar.</p></div>
+        <div class="card"><h3>Alta desde fotos</h3><p>Pásale fotos a tu IA: propone nombre, categoría y descripción, y los da de alta con foto.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="biz">
+        <h2>¿Tienes un negocio? Lo hacemos tuyo.</h2>
+        <p>La herramienta es gratis para siempre. Si prefieres que alguien se encargue, Aurora33 la instala, la personaliza y la mantiene por una cuota mensual:</p>
+        <ul>
+          <li>Instalación en todos tus equipos y migración de tu catálogo.</li>
+          <li>Personalización con tu marca, tus flujos e integraciones (WhatsApp, tu sistema contable).</li>
+          <li>Actualizaciones probadas, respaldos y seguimiento de seguridad.</li>
+          <li>Versión en la nube para tu equipo y soporte directo.</li>
+        </ul>
+        <a class="btn" href="mailto:hola@aurora33.app?subject=Kromo%20Cargo%20para%20mi%20negocio">Hablemos</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Preguntas frecuentes</h2>
+      <details><summary>¿Es seguro pegar un prompt que instala algo?</summary><p>El instalador es código abierto. Tu IA te explica cada paso antes de ejecutarlo, descarga un ejecutable publicado en GitHub y verifica su huella SHA-256: si no coincide, no instala nada. No usa sudo ni permisos de administrador.</p></details>
+      <details><summary>¿Dónde quedan mis datos?</summary><p>En un archivo en tu computadora. La app solo escucha en <code>localhost</code> y bloquea peticiones de otros sitios web. Tu IA ve los datos solo cuando tú le preguntas algo.</p></details>
+      <details><summary>¿Qué IA necesito?</summary><p>Un agente que pueda usar MCP locales: Claude Code, Codex CLI, Gemini CLI o Claude Desktop. En la web y en el celular no se pueden conectar MCP locales; para eso existe la versión en la nube del servicio para negocios.</p></details>
+      <details><summary>¿Funciona sin internet?</summary><p>La app y la venta, sí. Tu IA necesita internet para pensar, pero el inventario siempre está en tu equipo.</p></details>
+      <details><summary>¿Y si la IA se equivoca?</summary><p>Todo queda en el historial con el nombre de quien lo hizo (persona o IA) y se puede deshacer. Los cambios grandes siempre piden confirmación con vista previa.</p></details>
+    </section>
+
+    <footer>Kromo Cargo es gratis y su código está a la vista (<a href="https://polyformproject.org/licenses/shield/1.0.0">PolyForm Shield</a>). Hecho en México por Aurora33.</footer>
+  </div>
+  <div class="toast" id="toast">Prompt copiado</div>
+  <script>
+    document.getElementById("copiar").addEventListener("click", async () => {
+      const text = document.getElementById("prompt").innerText;
+      try { await navigator.clipboard.writeText(text); } catch (e) {
+        const r = document.createRange(); r.selectNodeContents(document.getElementById("prompt"));
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand("copy");
+      }
+      const t = document.getElementById("toast"); t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1600);
+    });
+  </script>
+</body>
+</html>
