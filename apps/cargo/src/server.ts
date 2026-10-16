@@ -31,8 +31,8 @@ const MANIFEST = JSON.stringify({
   lang: "es-MX",
   start_url: "/",
   display: "standalone",
-  background_color: "#0D1014",
-  theme_color: "#0D1014",
+  background_color: "#070709",
+  theme_color: "#070709",
   icons: [
     { src: "/icons/192.png", sizes: "192x192", type: "image/png" },
     { src: "/icons/512.png", sizes: "512x512", type: "image/png" },

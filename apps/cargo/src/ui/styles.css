@@ -1,36 +1,45 @@
-/* Kromo Cargo — tokens. Día es el tema base; Noche se activa por preferencia del sistema o con data-theme="dark".
+/* Fuentes empaquetadas (subconjunto latino, SIL OFL; licencias en assets/fonts). */
+@font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900; src: url("./assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-display: swap; font-weight: 600; src: url("./assets/fonts/space-grotesk-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-display: swap; font-weight: 700; src: url("./assets/fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 400; src: url("./assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 600; src: url("./assets/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); }
+
+/* Kromo Cargo — tokens (tema Aurora33: violeta #a335ee, Inter / Space Grotesk / JetBrains Mono). Día es el tema base; Noche se activa por preferencia del sistema o con data-theme="dark".
    Todos los pares de texto/fondo cumplen WCAG 2.2 AA (≥ 4.5:1 texto, ≥ 3:1 bordes de controles y foco);
    test/contraste.test.ts lo verifica leyendo este archivo. */
 :root {
   color-scheme: light;
-  --bg: #f9fafc;
+  --bg: #f9fafb;
   --surface: #ffffff;
-  --surface-2: #f2f3f6;
-  --border: #e1e5eb;
-  --border-input: #858c98;
-  --text: #232933;
-  --text-2: #5d646f;
-  --accent: #6b5fca;
-  --accent-hover: #5a4eb8;
-  --accent-strong: #5146a8;
-  --accent-soft: #e4ecf9;
-  --on-accent: #ffffff;
-  --series-1: #6b5fca;
-  --good: #19794b;
-  --good-soft: #e2f4ea;
-  --warn: #8a5300;
-  --warn-soft: #fdf0d9;
-  --bad: #e54151;
-  --bad-text: #b52c3a;
-  --bad-soft: #fdecee;
-  --ia: #0d6f7a;
-  --ia-soft: #dff3f4;
-  --focus: #6b5fca;
-  --overlay: rgb(13 16 20 / 0.45);
-  --shadow: 0 1px 2px rgb(13 16 20 / 0.05), 0 4px 16px rgb(13 16 20 / 0.07);
+  --surface-2: #eeeef0;
+  --sidebar: #f4f5f6;
+  --border: #e4e4e8;
+  --border-input: #7f7f87;
+  --text: #070709;
+  --text-2: #5d5d63;
+  --accent: #a335ee;
+  --accent-hover: #8f22d8;
+  --accent-strong: #8a1fd6;
+  --accent-soft: #f3e9fd;
+  --on-accent: #f9fafb;
+  --series-1: #a335ee;
+  --good: #0b7a24;
+  --good-soft: #e2f6e6;
+  --warn: #a83c00;
+  --warn-soft: #fff0e5;
+  --bad: #fe3248;
+  --bad-text: #c8102e;
+  --bad-soft: #ffebee;
+  --ia: #1f4fd1;
+  --ia-soft: #e8eefe;
+  --focus: #a335ee;
+  --overlay: rgb(7 7 9 / 0.45);
+  --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
 
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Escala tipográfica (rem: respeta el tamaño de letra elegido en el navegador). Base 16 px. */
   --fs-xs: 0.8125rem;  /* 13 px */
@@ -46,66 +55,69 @@
   --control: 2.5rem;    /* 40 px */
   --control-sm: 2.125rem; /* 34 px */
   --control-lg: 3.25rem;  /* 52 px */
-  --radius: 0.625rem;
-  --radius-sm: 0.5rem;
+  --radius: 0.5rem;
+  --radius-sm: 0.375rem;
+  --radius-lg: 0.75rem;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0d1014;
-    --surface: #14181f;
-    --surface-2: #1c222b;
-    --border: #292e36;
-    --border-input: #69717e;
-    --text: #dfe5ef;
-    --text-2: #979fab;
-    --accent: #9690f1;
-    --accent-hover: #aaa5f4;
-    --accent-strong: #b3aef6;
-    --accent-soft: #252e3d;
-    --on-accent: #0d1014;
-    --series-1: #9690f1;
-    --good: #4cc57f;
-    --good-soft: #15301f;
-    --warn: #e5a53a;
-    --warn-soft: #33270f;
-    --bad: #ff5d69;
-    --bad-text: #ff7d87;
-    --bad-soft: #3a1a1f;
-    --ia: #4fcfd9;
-    --ia-soft: #12303a;
-    --focus: #9690f1;
+    --bg: #070709;
+    --surface: #111114;
+    --surface-2: #1a1a1e;
+    --sidebar: #070709;
+    --border: #26262a;
+    --border-input: #6e6e76;
+    --text: #f9fafb;
+    --text-2: #9e9ea3;
+    --accent: #a335ee;
+    --accent-hover: #8f22d8;
+    --accent-strong: #c88bf7;
+    --accent-soft: #241634;
+    --on-accent: #f9fafb;
+    --series-1: #b45cf2;
+    --good: #3fcf63;
+    --good-soft: #10291a;
+    --warn: #ff8f45;
+    --warn-soft: #33200f;
+    --bad: #fe3248;
+    --bad-text: #ff6b7b;
+    --bad-soft: #3a1219;
+    --ia: #7d9dff;
+    --ia-soft: #15203f;
+    --focus: #b45cf2;
     --overlay: rgb(0 0 0 / 0.6);
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
+    --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 2px 4px -1px hsl(0 0% 0% / 0.25);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d1014;
-  --surface: #14181f;
-  --surface-2: #1c222b;
-  --border: #292e36;
-  --border-input: #69717e;
-  --text: #dfe5ef;
-  --text-2: #979fab;
-  --accent: #9690f1;
-  --accent-hover: #aaa5f4;
-  --accent-strong: #b3aef6;
-  --accent-soft: #252e3d;
-  --on-accent: #0d1014;
-  --series-1: #9690f1;
-  --good: #4cc57f;
-  --good-soft: #15301f;
-  --warn: #e5a53a;
-  --warn-soft: #33270f;
-  --bad: #ff5d69;
-  --bad-text: #ff7d87;
-  --bad-soft: #3a1a1f;
-  --ia: #4fcfd9;
-  --ia-soft: #12303a;
-  --focus: #9690f1;
+  --bg: #070709;
+  --surface: #111114;
+  --surface-2: #1a1a1e;
+  --sidebar: #070709;
+  --border: #26262a;
+  --border-input: #6e6e76;
+  --text: #f9fafb;
+  --text-2: #9e9ea3;
+  --accent: #a335ee;
+  --accent-hover: #8f22d8;
+  --accent-strong: #c88bf7;
+  --accent-soft: #241634;
+  --on-accent: #f9fafb;
+  --series-1: #b45cf2;
+  --good: #3fcf63;
+  --good-soft: #10291a;
+  --warn: #ff8f45;
+  --warn-soft: #33200f;
+  --bad: #fe3248;
+  --bad-text: #ff6b7b;
+  --bad-soft: #3a1219;
+  --ia: #7d9dff;
+  --ia-soft: #15203f;
+  --focus: #b45cf2;
   --overlay: rgb(0 0 0 / 0.6);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
+  --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 2px 4px -1px hsl(0 0% 0% / 0.25);
 }
 
 /* ── Base ─────────────────────────────────────────────── */
@@ -117,6 +129,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); font
 #root { height: 100%; }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; line-height: 1.25; }
+h1, h2, .kpi .v, .total .v, .brand-name { font-family: var(--font-display); letter-spacing: -0.01em; }
 h1 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
 h2 { font-size: var(--fs-md); font-weight: 650; }
 h3 { font-size: var(--fs-sm); font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -140,21 +153,21 @@ a { color: var(--accent-strong); text-underline-offset: 0.15em; }
 
 /* ── Layout ───────────────────────────────────────────── */
 .shell { display: flex; height: 100%; }
-.sidebar { flex: 0 0 15rem; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1rem 0.75rem; gap: 0.25rem; overflow-y: auto; }
+.sidebar { flex: 0 0 15rem; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1rem 0.75rem; gap: 0.25rem; overflow-y: auto; }
 .brand { display: flex; gap: 0.75rem; align-items: center; padding: 0.25rem 0.5rem 1.25rem; }
 .brand-logo { width: 2.5rem; height: 2.5rem; flex: none; display: block; }
 .brand-name { font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .brand-sub { font-size: var(--fs-sm); color: var(--text-2); }
 .nav { display: flex; flex-direction: column; gap: 0.125rem; margin: 0; padding: 0; list-style: none; }
 .nav-item { display: flex; align-items: center; gap: 0.75rem; min-height: var(--control); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); color: var(--text-2); text-decoration: none; font-weight: 500; }
-.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item:hover { background: var(--accent-soft); color: var(--text); }
 .nav-item[aria-current="page"] { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
 .nav-item svg { width: 1.25rem; height: 1.25rem; flex: none; }
 .nav-kbd { margin-left: auto; font-size: var(--fs-xs); color: var(--text-2); font-family: var(--mono); border: 1px solid var(--border); border-radius: 0.3rem; padding: 0 0.3rem; }
 .nav-item[aria-current="page"] .nav-kbd { color: var(--accent-strong); border-color: currentColor; }
 .sidebar-foot { margin-top: auto; padding: 0.75rem 0.25rem 0; display: flex; flex-direction: column; gap: 0.75rem; border-top: 1px solid var(--border); }
 /* Persona con sesión: avatar, nombre y rol, y el botón para salir. */
-.user-card { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem; border-radius: var(--radius); background: var(--surface-2); }
+.user-card { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
 .user-meta { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; line-height: 1.25; }
 .user-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-role { font-size: var(--fs-sm); color: var(--text-2); }
@@ -374,7 +387,7 @@ details.data-table summary { cursor: pointer; color: var(--accent-strong); font-
 /* ── Capas ────────────────────────────────────────────── */
 .overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; justify-content: center; align-items: flex-start; padding: 6vh 1rem; z-index: 40; overflow: auto; }
 .overlay.side { justify-content: flex-end; align-items: stretch; padding: 0; }
-.modal { background: var(--surface); border-radius: 0.875rem; box-shadow: var(--shadow); width: min(40rem, 100%); border: 1px solid var(--border); }
+.modal { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); width: min(40rem, 100%); border: 1px solid var(--border); }
 .overlay.side .modal { border-radius: 0; width: min(36rem, 100%); height: 100%; overflow: auto; display: flex; flex-direction: column; }
 .overlay.side .modal-body { flex: 1; }
 .modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }

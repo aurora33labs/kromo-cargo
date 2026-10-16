@@ -25,7 +25,7 @@ const noche = { ...dia, ...tokens(':root[data-theme="dark"] {') };
 
 // [texto, fondo, mínimo]. 4.5 = texto normal (1.4.3); 3 = bordes de controles, foco y marcas de gráficas (1.4.11).
 const PARES: [string, string, number][] = [
-  ...["bg", "surface", "surface-2"].flatMap((f): [string, string, number][] => [
+  ...["bg", "surface", "surface-2", "sidebar"].flatMap((f): [string, string, number][] => [
     ["text", f, 4.5],
     ["text-2", f, 4.5],
     ["accent-strong", f, 4.5],
