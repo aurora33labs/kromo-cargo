@@ -28,7 +28,7 @@ La misma app corre como servicio web cuando existe `KROMO_URL_PUBLICA` o `RAILWA
 - **MCP remoto en `/mcp`** (Streamable HTTP, sin estado):
   - **OAuth 2.1** con PKCE y registro dinámico, para los conectores de claude.ai y ChatGPT. La autorización se da con el PIN de un dueño.
   - **Tokens de acceso** para Claude Code, Gemini CLI y otros agentes.
-  - Todo se administra y revoca en *Ajustes e IA*.
+  - Todo se administra y desconecta en *Ajustes → Conectar IA*.
 - Una IA remota no puede leer archivos del servidor: solo usa lo subido a la app o manda el contenido (CSV) directamente. Los PDF y Excel generados se entregan con enlaces firmados que caducan en 1 hora.
 
 Despliegue, variables y template: **[RAILWAY.md](RAILWAY.md)**. La imagen está en `Dockerfile` y la configuración de Railway en `railway.json`.

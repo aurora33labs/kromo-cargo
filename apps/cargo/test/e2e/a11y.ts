@@ -11,15 +11,19 @@ const cli = resolve(import.meta.dir, "../../src/cli.ts");
 const PAGES = ["venta", "productos", "entradas", "reportes", "etiquetas", "importar", "historial", "ajustes"];
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-function arrancar(port: number, extra: Record<string, string> = {}) {
+async function arrancar(port: number, extra: Record<string, string> = {}) {
+  // Un servidor viejo en el mismo puerto haría que se audite otra versión de la app.
+  if (await fetch(`http://localhost:${port}/salud`).then(() => true).catch(() => false)) throw new Error(`El puerto ${port} ya está ocupado: cierra ese servidor antes de auditar.`);
   const env = { ...process.env, KROMO_DATA: mkdtempSync(join(tmpdir(), "kc-a11y-")), ...extra } as Record<string, string>;
   Bun.spawnSync([process.execPath, cli, "demo"], { env });
   return Bun.spawn([process.execPath, cli, "serve", "--no-open", "--port", String(port)], { env, stdout: "ignore", stderr: "ignore" });
 }
 
-const local = arrancar(4710);
-const servidor = arrancar(4711, { KROMO_MODO: "servidor", KROMO_PIN_INICIAL: "24681357" });
-await Bun.sleep(1500);
+const local = await arrancar(4710);
+const servidor = await arrancar(4711, { KROMO_MODO: "servidor", KROMO_PIN_INICIAL: "24681357" });
+for (const port of [4710, 4711]) {
+  for (let i = 0; i < 100 && !(await fetch(`http://localhost:${port}/salud`).then((r) => r.ok).catch(() => false)); i++) await Bun.sleep(100);
+}
 
 const browser = await chromium.launch({ channel: "chromium", executablePath: process.env.CHROME_PATH });
 let fallas = 0;
@@ -44,6 +48,27 @@ try {
       await page.waitForTimeout(600);
       await auditar(page, `${tema} · ${p}`);
     }
+    // Cada pestaña de Ajustes.
+    for (const tab of ["Conectar IA", "Usuarios", "Negocio"]) {
+      await page.goto("http://localhost:4710/#/ajustes");
+      await page.waitForTimeout(400);
+      await page.getByRole("tab", { name: tab }).click();
+      await page.waitForTimeout(300);
+      await auditar(page, `${tema} · ajustes › ${tab}`);
+    }
+    const serv = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
+    await serv.goto("http://localhost:4711/");
+    await serv.getByLabel("Tu PIN").fill("24681357");
+    await serv.getByRole("button", { name: "Entrar" }).click();
+    await serv.getByRole("navigation", { name: "Secciones" }).first().waitFor({ timeout: 5000 });
+    await serv.goto("http://localhost:4711/#/ajustes");
+    await serv.getByRole("tab", { name: "Conectar IA" }).waitFor({ timeout: 5000 });
+    await serv.getByRole("tab", { name: "Conectar IA" }).click();
+    await auditar(serv, `${tema} · ajustes › Conectar IA (modo servidor)`);
+    await serv.getByRole("button", { name: "ChatGPT" }).click();
+    await serv.locator("details.mas summary").first().click();
+    await auditar(serv, `${tema} · ajustes › ChatGPT y otros agentes (modo servidor)`);
+    await serv.close();
     // Panel de producto abierto.
     await page.goto("http://localhost:4710/#/productos");
     await page.waitForTimeout(600);
@@ -61,7 +86,7 @@ try {
 
     const login = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
     await login.goto("http://localhost:4711/");
-    await login.waitForTimeout(600);
+    await login.getByLabel("Tu PIN").waitFor({ timeout: 5000 }); // si la app no carga, la auditoría falla en vez de revisar una página vacía
     await auditar(login, `${tema} · login`);
     await login.close();
   }

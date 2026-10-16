@@ -61,6 +61,11 @@ const paths: Record<string, string> = {
   sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
   monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
+  users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+  tienda: "M3 9l1.5-5h15L21 9M3 9v11h18V9M3 9h18M9 20v-6h6v6",
+  link: "M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7",
+  phone: "M7 2h10v20H7zM11 18h2",
+  terminal: "M4 17l6-6-6-6M12 19h8",
 };
 
 export function Icon({ name }: { name: keyof typeof paths | string }) {
@@ -254,6 +259,57 @@ export function CopyButton({ texto, etiqueta, className = "btn sm" }: { texto: s
     </>
   );
 }
+
+/** Pestañas accesibles (patrón ARIA tabs): flechas, Inicio y Fin cambian de pestaña. */
+export function Tabs<T extends string>({ label, value, onChange, tabs, idBase }: { label: string; value: T; onChange: (v: T) => void; tabs: readonly (readonly [T, string, string?])[]; idBase: string }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  return (
+    <div role="tablist" aria-label={label} className="tabs">
+      {tabs.map(([id, texto, icono], k) => (
+        <button
+          key={id}
+          ref={(el) => void (refs.current[k] = el)}
+          type="button"
+          role="tab"
+          className="tab"
+          id={`${idBase}-tab-${id}`}
+          aria-controls={`${idBase}-panel-${id}`}
+          aria-selected={value === id}
+          tabIndex={value === id ? 0 : -1}
+          onClick={() => onChange(id)}
+          onKeyDown={(e) => {
+            const n = tabs.length;
+            const destino = e.key === "ArrowRight" ? (k + 1) % n : e.key === "ArrowLeft" ? (k - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+            if (destino < 0) return;
+            e.preventDefault();
+            onChange(tabs[destino]![0]);
+            refs.current[destino]?.focus();
+          }}
+        >
+          {icono && <Icon name={icono} />}
+          {texto}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TabPanel({ idBase, id, activo, children }: { idBase: string; id: string; activo: boolean; children: ReactNode }) {
+  return (
+    <div role="tabpanel" id={`${idBase}-panel-${id}`} aria-labelledby={`${idBase}-tab-${id}`} hidden={!activo} tabIndex={0} className="tabpanel">
+      {activo && children}
+    </div>
+  );
+}
+
+/** Iniciales para el avatar de una persona. */
+export const iniciales = (nombre: string) =>
+  nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("") || "?";
 
 export function EmptyState({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (

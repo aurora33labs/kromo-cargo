@@ -17,7 +17,7 @@ Un proyecto de Railway por negocio. La app y el MCP remoto quedan en `https://<d
    | `KROMO_SECRETO` | 64 caracteres aleatorios | **Opcional.** Firma de enlaces de descarga; si falta se genera y se guarda en la base |
 
 4. **Networking → Generate Domain.** Railway define `RAILWAY_PUBLIC_DOMAIN` y la app la usa como URL pública. Para un dominio propio, define además `KROMO_URL_PUBLICA=https://cargo.minegocio.mx`.
-5. Abre el dominio, entra con el PIN y ve a **Ajustes e IA** para conectar las IAs.
+5. Abre el dominio, entra con el PIN y ve a **Ajustes → Conectar IA** para conectar las IAs.
 
 El healthcheck es `/salud`. Con Volume, el servicio debe tener **1 réplica**.
 
@@ -25,9 +25,9 @@ El healthcheck es `/salud`. Con Volume, el servicio debe tener **1 réplica**.
 
 - **Claude (claude.ai, escritorio, celular):** *Configuración → Conectores → Agregar conector personalizado*, pega `https://<dominio>/mcp`. Se abre la página de la tienda: PIN de dueño → *Permitir*.
 - **ChatGPT:** *Configuración → Apps y conectores → Modo desarrollador → Crear*, misma URL, autenticación OAuth.
-- **Claude Code / Gemini CLI / otros:** crea un token en *Ajustes e IA* y usa el comando que aparece ahí (encabezado `Authorization: Bearer …`).
+- **Claude Code / Gemini CLI / otros:** crea un token en *Ajustes → Conectar IA → Otros agentes* y usa el comando que aparece ahí (encabezado `Authorization: Bearer …`).
 
-Todo lo que hace cada IA queda en el Historial con su nombre, y los accesos se revocan desde *Ajustes e IA*.
+Todo lo que hace cada IA queda en el Historial con su nombre, y los accesos se desconectan desde *Ajustes → Conectar IA*.
 
 ## Crear el template (botón "Deploy on Railway")
 

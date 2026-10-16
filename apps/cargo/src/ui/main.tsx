@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { login, logout, sesionInfo, ultimoCambio } from "./api.ts";
-import { ActionProvider, Icon, Logo, ToastProvider, useToast } from "./components.tsx";
+import { ActionProvider, Icon, Logo, ToastProvider, iniciales, useToast } from "./components.tsx";
 import { Ajustes } from "./pages/Ajustes.tsx";
 import { Entradas } from "./pages/Entradas.tsx";
 import { Etiquetas } from "./pages/Etiquetas.tsx";
@@ -21,7 +21,7 @@ const PAGES = [
   { id: "etiquetas", label: "Etiquetas", icon: "etiquetas", kbd: "", C: Etiquetas },
   { id: "importar", label: "Importar / exportar", icon: "importar", kbd: "", C: Importar },
   { id: "historial", label: "Historial", icon: "historial", kbd: "", C: Historial },
-  { id: "ajustes", label: "Ajustes e IA", icon: "ajustes", kbd: "", C: Ajustes },
+  { id: "ajustes", label: "Ajustes", icon: "ajustes", kbd: "", C: Ajustes },
 ] as const;
 
 function usePage() {
@@ -70,6 +70,34 @@ function SelectorTema() {
   );
 }
 
+function TarjetaUsuario({ usuario, onLogout }: { usuario: { nombre: string; rol: string }; onLogout?: () => void }) {
+  const rol = usuario.rol === "dueno" ? "Dueño" : "Empleado";
+  return (
+    <div className="user-card">
+      <span className="avatar" aria-hidden>{iniciales(usuario.nombre)}</span>
+      <span className="user-meta">
+        <span className="user-name">{usuario.nombre}</span>
+        {/* En modo local el usuario por defecto se llama "Dueño": no repetimos el rol. */}
+        {usuario.nombre.toLowerCase() !== rol.toLowerCase() && <span className="user-role">{rol}</span>}
+      </span>
+      {onLogout && (
+        <button type="button" className="btn ghost icon" onClick={onLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
+          <Icon name="logout" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EstadoEnVivo({ enLinea }: { enLinea: boolean }) {
+  return (
+    <span className={`live-pill ${enLinea ? "" : "off"}`} title={enLinea ? "Los cambios que haga la IA aparecen al momento" : "No hay conexión con la app"}>
+      {enLinea ? "En vivo" : "Sin conexión"}
+      <span className="sr-only">{enLinea ? ": los cambios de la IA aparecen al momento" : ": revisa que la app siga abierta"}</span>
+    </span>
+  );
+}
+
 const PRINCIPALES = ["venta", "productos", "entradas", "reportes"];
 
 function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nombre: string; rol: string } | null; onLogout?: () => void }) {
@@ -77,6 +105,7 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
   const toast = useToast();
   const [version, setVersion] = useState(0);
   const [mas, setMas] = useState(false);
+  const [enLinea, setEnLinea] = useState(true);
   const last = useRef<number | null>(null);
   const main = useRef<HTMLElement>(null);
   const primera = useRef(true);
@@ -86,8 +115,10 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
   useEffect(() => {
     let alive = true;
     const tick = async () => {
-      const c = await ultimoCambio().catch(() => null);
-      if (!alive || !c) return;
+      const c = await ultimoCambio().catch(() => undefined);
+      if (!alive) return;
+      setEnLinea(c !== undefined);
+      if (!c) return;
       if (last.current !== null && c.id !== last.current) {
         setVersion((v) => v + 1);
         if (c.actor_tipo === "ia") toast({ kind: "ia", msg: <><b>IA · {c.actor_cliente}</b><br />{c.resumen}</> });
@@ -149,18 +180,11 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
             </ul>
           </nav>
           <div className="sidebar-foot">
-            <span className="live">En vivo: ves los cambios de la IA al momento</span>
-            {usuario && (
-              <div className="user-row">
-                <span>{usuario.nombre} · {usuario.rol === "dueno" ? "dueño" : "empleado"}</span>
-                {onLogout && (
-                  <button className="btn ghost sm" onClick={onLogout}>
-                    <Icon name="logout" /> Salir
-                  </button>
-                )}
-              </div>
-            )}
-            <SelectorTema />
+            {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} />}
+            <div className="foot-row">
+              <EstadoEnVivo enLinea={enLinea} />
+              <SelectorTema />
+            </div>
           </div>
         </aside>
         <main className="main" id="contenido" ref={main} tabIndex={-1}>
@@ -180,14 +204,13 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
           {mas && (
             <ul className="more-menu nav" id="menu-mas">
               {PAGES.filter((p) => !PRINCIPALES.includes(p.id)).map((p) => <li key={p.id}>{enlace(p)}</li>)}
-              {onLogout && (
-                <li>
-                  <button className="nav-item btn ghost" style={{ width: "100%", justifyContent: "flex-start" }} onClick={onLogout}>
-                    <Icon name="logout" /> Salir
-                  </button>
-                </li>
-              )}
-              <li style={{ padding: "0.25rem 0.75rem" }}><SelectorTema /></li>
+              <li className="more-foot">
+                {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} />}
+                <div className="foot-row">
+                  <EstadoEnVivo enLinea={enLinea} />
+                  <SelectorTema />
+                </div>
+              </li>
             </ul>
           )}
         </nav>
