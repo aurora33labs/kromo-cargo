@@ -26,14 +26,15 @@ export function Etiquetas() {
     <div className="page">
       <div className="page-head">
         <h1>Etiquetas</h1>
-        <div className="spacer" />
-        <p className="hint">Hoja carta, 30 etiquetas de 2⅝" × 1" (tipo Avery 5160)</p>
+        <div className="page-actions">
+          <p className="hint">Hoja carta, 30 etiquetas de 2⅝" × 1" (tipo Avery 5160)</p>
+        </div>
       </div>
       <div className="cols">
         <div className="card">
           <div className="card-head">
             <label htmlFor="etq-filtro" className="sr-only">Filtrar productos</label>
-            <input id="etq-filtro" className="input" type="search" placeholder="Filtrar productos…" value={texto} onChange={(e) => setTexto(e.target.value)} />
+            <input id="etq-filtro" className="input grow" type="search" placeholder="Filtrar productos…" value={texto} onChange={(e) => setTexto(e.target.value)} />
           </div>
           <div style={{ maxHeight: "65vh", overflow: "auto" }} tabIndex={0} role="region" aria-label="Productos para etiquetar">
             <table className="table">

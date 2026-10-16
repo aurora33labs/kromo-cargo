@@ -108,13 +108,14 @@ export function Venta() {
     <div className="page">
       <div className="page-head">
         <h1>Venta rápida</h1>
-        <div className="spacer" />
-        <p className="hint" id="venta-ayuda">
-          Escanea o escribe · <kbd>3*código</kbd> agrega 3 · <kbd>F9</kbd> cobra · <kbd>Esc</kbd> limpia
-        </p>
+        <div className="page-actions">
+          <p className="hint" id="venta-ayuda">
+            Escanea o escribe · <kbd>3*código</kbd> agrega 3 · <kbd>F9</kbd> cobra · <kbd>Esc</kbd> limpia
+          </p>
+        </div>
       </div>
       <div className="pos">
-        <section aria-label="Productos">
+        <section className="pos-main" aria-label="Productos">
           <label htmlFor="venta-buscar" className="sr-only">Buscar producto</label>
           <input
             id="venta-buscar"
@@ -173,7 +174,6 @@ export function Venta() {
         <section className="card cart" id="ticket" aria-labelledby="ticket-titulo">
           <div className="card-head">
             <h2 id="ticket-titulo" tabIndex={-1}>Ticket</h2>
-            <div className="spacer" />
             {lineas.length > 0 && (
               <button className="btn ghost sm" onClick={() => setLineas([])}>Limpiar</button>
             )}
@@ -182,7 +182,7 @@ export function Venta() {
           <ul className="cart-lines" aria-label="Productos en el ticket" hidden={!lineas.length}>
             {lineas.map((l, i) => (
               <li className="cline" key={l.p.id}>
-                <div>
+                <div className="cline-info">
                   <div className="strong">{l.p.nombre}</div>
                   <div className="muted small num">
                     {money(l.p.precio)} · hay {qty(l.p.stock)}

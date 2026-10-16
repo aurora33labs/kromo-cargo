@@ -76,6 +76,53 @@ try {
     else console.log(`✓ reflow 320 px · ${p}`);
   }
 
+  // Layout con flex: el contenido usa todo el ancho disponible en cada tamaño de pantalla.
+  for (const ancho of [1920, 1440, 1024, 768, 390, 320]) {
+    const lp = await nuevaPagina({ viewport: { width: ancho, height: 900 } });
+    for (const p of PAGES) {
+      await lp.goto(`http://localhost:4710/#/${p}`);
+      await lp.waitForTimeout(500);
+      const r = await lp.evaluate(() => {
+        const errores: string[] = [];
+        const main = document.querySelector<HTMLElement>(".main")!.getBoundingClientRect();
+        const page = document.querySelector<HTMLElement>(".page")!;
+        const pr = page.getBoundingClientRect();
+        if (Math.abs(main.right - pr.right) > 1 || Math.abs(main.left - pr.left) > 1) errores.push(`.page no llena .main (${Math.round(pr.width)} de ${Math.round(main.width)} px)`);
+        for (const seg of document.querySelectorAll<HTMLElement>(".seg.full")) {
+          // Anchos iguales cuando caben todos al ancho del más largo; si no, flex los ajusta a su contenido.
+          const botones = [...seg.querySelectorAll<HTMLElement>("button")];
+          const contenido = botones.map((b) => b.scrollWidth);
+          const caben = Math.max(...contenido) * botones.length <= seg.clientWidth;
+          const anchos = botones.map((b) => b.getBoundingClientRect().width);
+          if (caben && Math.max(...anchos) - Math.min(...anchos) > 1.5) errores.push(`botones de "${seg.getAttribute("aria-label")}" con anchos distintos`);
+          const sr = seg.getBoundingClientRect();
+          if ([...seg.querySelectorAll("button")].some((b) => b.getBoundingClientRect().right > sr.right + 1)) errores.push(`"${seg.getAttribute("aria-label")}" se corta`);
+        }
+        const grid = document.querySelector<HTMLElement>(".pgrid");
+        if (grid && grid.children.length > 1) {
+          const gr = grid.getBoundingClientRect();
+          const items = [...grid.children].map((li) => li.getBoundingClientRect());
+          const primeraFila = items.filter((i) => Math.abs(i.top - items[0]!.top) < 2);
+          if (primeraFila.length < items.length && Math.abs(primeraFila.at(-1)!.right - gr.right) > 1) errores.push("la cuadrícula de productos no llena la fila");
+        }
+        for (const h of document.querySelectorAll<HTMLElement>(".card-head")) {
+          const ico = h.querySelector(".ico");
+          const h2 = h.querySelector("h2");
+          if (ico && h2 && ico.getBoundingClientRect().top > h2.getBoundingClientRect().bottom) errores.push(`el ícono de "${h2.textContent}" quedó en otra línea`);
+        }
+        return errores;
+      });
+      if (r.length) (fallas += r.length, console.log(`✗ layout ${ancho} px · ${p}: ${r.join("; ")}`));
+      else console.log(`✓ layout ${ancho} px · ${p}`);
+    }
+    if (ancho === 390) for (const p of ["productos", "historial", "venta", "ajustes"]) {
+      await lp.goto(`http://localhost:4710/#/${p}`);
+      await lp.waitForTimeout(500);
+      await auditar(lp, `celular · ${p}`);
+    }
+    await lp.close();
+  }
+
   // Texto al 200 % (1.4.4): sin scroll horizontal de página a 1280 px.
   const zoom = await nuevaPagina({ viewport: { width: 1280, height: 800 } });
   for (const p of PAGES) {

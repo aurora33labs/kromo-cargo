@@ -20,17 +20,18 @@ export function Productos() {
     <div className="page">
       <div className="page-head">
         <h1>Productos</h1>
-        <span className="badge num">{data?.total ?? "…"}</span>
-        <div className="spacer" />
-        <button className="btn primary" onClick={() => setAbierto("nuevo")}>
-          <Icon name="plus" /> Nuevo producto
-        </button>
+        <span className="badge num">{data?.total ?? "…"}<span className="sr-only"> productos</span></span>
+        <div className="page-actions">
+          <button className="btn primary" onClick={() => setAbierto("nuevo")}>
+            <Icon name="plus" /> Nuevo producto
+          </button>
+        </div>
       </div>
-      <div className="row" style={{ marginBottom: "0.75rem", alignItems: "flex-end" }} role="search" aria-label="Filtrar productos">
-        <Field label="Buscar" style={{ flex: "1 1 14rem", maxWidth: "22rem" }}>
+      <div className="row end" style={{ marginBottom: "0.75rem" }} role="search" aria-label="Filtrar productos">
+        <Field label="Buscar" className="grow-2">
           <input className="input" type="search" placeholder="Nombre, SKU o código…" value={texto} onChange={(e) => setTexto(e.target.value)} />
         </Field>
-        <Field label="Categoría" style={{ flex: "1 1 12rem", maxWidth: "16rem" }}>
+        <Field label="Categoría" className="grow">
           <select className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
             <option value="">Todas</option>
             {cats.data?.filter((c) => c.categoria !== "Sin categoría").map((c) => (
@@ -40,12 +41,12 @@ export function Productos() {
             ))}
           </select>
         </Field>
-        <label className="check">
+        <label className="check none">
           <input type="checkbox" checked={soloBajo} onChange={(e) => setSoloBajo(e.target.checked)} /> Solo stock bajo
         </label>
       </div>
-      <div className="card table-wrap" tabIndex={0} role="region" aria-label="Lista de productos">
-        <table className="table">
+      <div className="card table-wrap cq" tabIndex={0} role="region" aria-label="Lista de productos">
+        <table className="table responsive productos">
           <thead>
             <tr>
               <th scope="col">Producto</th>
@@ -59,7 +60,7 @@ export function Productos() {
           <tbody>
             {data?.productos.map((p) => (
               <tr key={p.id} className="click" onClick={(e) => !(e.target as HTMLElement).closest("button") && setAbierto(p.id)}>
-                <td>
+                <td className="prod">
                   <div className="pcell">
                     <Thumb foto={p.foto} nombre={p.nombre} />
                     <div>
@@ -68,11 +69,11 @@ export function Productos() {
                     </div>
                   </div>
                 </td>
-                <td>{p.categoria ?? <span className="muted">—</span>}</td>
-                <td className="r num">{money(p.precio)}</td>
-                <td className="r num muted">{money(p.costo)}</td>
-                <td className="r num muted">{p.precio ? `${Math.round(((p.precio - p.costo) / p.precio) * 100)}%` : "—"}</td>
-                <td className="r">
+                <td data-label="Categoría">{p.categoria ?? <span className="muted">—</span>}</td>
+                <td className="r num" data-label="Precio">{money(p.precio)}</td>
+                <td className="r num muted" data-label="Costo">{money(p.costo)}</td>
+                <td className="r num muted" data-label="Margen">{p.precio ? `${Math.round(((p.precio - p.costo) / p.precio) * 100)}%` : "—"}</td>
+                <td className="r stock" data-label="Stock">
                   <StockBadge stock={p.stock} minimo={p.stock_minimo} />
                 </td>
               </tr>
@@ -198,7 +199,7 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
       }
     >
       {id && prod && (
-        <div className="row" style={{ alignItems: "flex-start", gap: "1rem", flexWrap: "nowrap" }}>
+        <div className="row start nowrap" style={{ gap: "1rem" }}>
           <label className="photo-pick" title="Cambiar foto">
             {prod.foto ? (
               <img src={prod.foto} alt={`Foto de ${prod.nombre}`} />
@@ -207,7 +208,7 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
             )}
             <input type="file" accept="image/*" className="file-input" aria-label={prod.foto ? "Cambiar foto" : "Agregar foto"} onChange={(e) => e.target.files?.[0] && subirFoto(e.target.files[0])} />
           </label>
-          <div className="stack tight" style={{ flex: 1 }}>
+          <div className="stack tight fill">
             <div className="row">
               <StockBadge stock={prod.stock} minimo={prod.stock_minimo} />
               {!prod.activo && <span className="badge">Archivado</span>}
@@ -252,7 +253,7 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
 
       <div className="grid2">
         {CAMPOS.map((c) => (
-          <Field key={c.k} label={<>{c.label}{!id && (c.k === "nombre" || c.k === "precio") && <span aria-hidden> *</span>}</>} style={c.ancho === 2 ? { gridColumn: "1 / -1" } : undefined}>
+          <Field key={c.k} label={<>{c.label}{!id && (c.k === "nombre" || c.k === "precio") && <span aria-hidden> *</span>}</>} className={c.ancho === 2 ? "full" : undefined}>
             {c.tipo === "area" ? (
               <textarea className="input" rows={2} value={val(c.k)} onChange={(e) => set(c.k, e.target.value)} />
             ) : (

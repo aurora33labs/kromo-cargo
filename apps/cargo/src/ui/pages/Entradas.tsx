@@ -46,7 +46,7 @@ export function Entradas() {
       <div className="cols">
         <div className="card">
           <div className="card-head">
-            <div style={{ flex: 1 }}>
+            <div className="grow">
               <ProductPicker onPick={agregar} autoFocus label="Producto que llegó" placeholder="Escanea o busca el producto que llegó…" />
             </div>
           </div>

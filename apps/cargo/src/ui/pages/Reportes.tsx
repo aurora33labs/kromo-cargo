@@ -113,14 +113,15 @@ export function Reportes() {
     <div className="page">
       <div className="page-head">
         <h1>Reportes</h1>
-        <div className="spacer" />
-        <Segmented label="Periodo" value={rango} options={[...RANGOS.map((x) => [x.id, x.label] as const), ["custom", "Otro rango"] as const]} onChange={setRango} />
-        {rango === "custom" && (
-          <div className="row" style={{ alignItems: "flex-end" }}>
-            <Field label="Desde"><input type="date" className="input" value={desdeC} max={hastaC} onChange={(e) => setDesdeC(e.target.value)} /></Field>
-            <Field label="Hasta"><input type="date" className="input" value={hastaC} min={desdeC} onChange={(e) => setHastaC(e.target.value)} /></Field>
-          </div>
-        )}
+        <div className="page-actions">
+          {rango === "custom" && (
+            <div className="row end">
+              <Field label="Desde"><input type="date" className="input" value={desdeC} max={hastaC} onChange={(e) => setDesdeC(e.target.value)} /></Field>
+              <Field label="Hasta"><input type="date" className="input" value={hastaC} min={desdeC} onChange={(e) => setHastaC(e.target.value)} /></Field>
+            </div>
+          )}
+          <Segmented label="Periodo" value={rango} options={[...RANGOS.map((x) => [x.id, x.label] as const), ["custom", "Otro rango"] as const]} onChange={setRango} />
+        </div>
       </div>
 
       <h2 className="sr-only">Resumen del periodo</h2>
@@ -183,7 +184,7 @@ export function Reportes() {
             </div>
           </div>
           <div className="card">
-            <div className="card-head"><h2>Por agotarse (7 días)</h2><div className="spacer" /><span className="badge warn">{bajo.data?.total ?? 0}<span className="sr-only"> productos</span></span></div>
+            <div className="card-head"><h2>Por agotarse (7 días)</h2><span className="badge warn">{bajo.data?.total ?? 0}<span className="sr-only"> productos</span></span></div>
             <table className="table">
               <tbody>
                 {bajo.data?.productos.slice(0, 12).map((p: any) => (
@@ -200,7 +201,7 @@ export function Reportes() {
             {bajo.data && !bajo.data.total && <EmptyState>Todo bien surtido.</EmptyState>}
           </div>
           <div className="card">
-            <div className="card-head"><h2>Sin venta en 30 días</h2><div className="spacer" /><span className="muted small num">{money(quietos.data?.valor_detenido)} detenidos</span></div>
+            <div className="card-head"><h2>Sin venta en 30 días</h2><span className="muted small num">{money(quietos.data?.valor_detenido)} detenidos</span></div>
             <table className="table">
               <tbody>
                 {quietos.data?.productos.slice(0, 8).map((p: any) => (

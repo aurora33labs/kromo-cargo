@@ -49,7 +49,7 @@ function IaRemota({ urlMcp }: { urlMcp: string }) {
         </div>
         <div className="stack tight">
           <h3>Claude Code, Gemini CLI u otro agente (con token)</h3>
-          <div className="row" style={{ alignItems: "flex-end" }}>
+          <div className="row end">
             <Field label="Nombre del token" help="Por ejemplo: Claude Code de Lupe" className="grow">
               <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} />
             </Field>
@@ -156,21 +156,21 @@ export function Ajustes() {
                 ))}
               </tbody>
             </table>
-            <div className="card-pad row" style={{ borderTop: "1px solid var(--border)", alignItems: "flex-start" }} role="group" aria-label="Agregar usuario">
-              <Field label="Nombre" style={{ flex: "2 1 9rem" }}>
+            <div className="card-pad row start" style={{ borderTop: "1px solid var(--border)" }} role="group" aria-label="Agregar usuario">
+              <Field label="Nombre" className="grow-2">
                 <input className="input" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
               </Field>
-              <Field label="Rol" style={{ flex: "1 1 8rem" }}>
+              <Field label="Rol" className="grow">
                 <select className="select" value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value })}>
                   <option value="empleado">Empleado</option>
                   <option value="dueno">Dueño</option>
                 </select>
               </Field>
-              <Field label="PIN" help={`${cfg.data?.pin_minimo ?? 4} a 12 dígitos`} style={{ flex: "1 1 8rem" }}>
+              <Field label="PIN" help={`${cfg.data?.pin_minimo ?? 4} a 12 dígitos`} className="grow">
                 <input className="input" inputMode="numeric" autoComplete="new-password" maxLength={12} value={nuevo.pin} onChange={(e) => setNuevo({ ...nuevo, pin: e.target.value.replace(/\D/g, "") })} />
               </Field>
               <button
-                className="btn primary"
+                className="btn primary none"
                 style={{ marginTop: "1.6rem" }}
                 disabled={!nuevo.nombre || nuevo.pin.length < (cfg.data?.pin_minimo ?? 4)}
                 onClick={async () => (await run("guardar_usuario", nuevo, { exito: () => "Usuario creado" })) && setNuevo({ nombre: "", rol: "empleado", pin: "" })}

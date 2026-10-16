@@ -216,7 +216,7 @@ export function Field({ label, help, error, children, style, className }: { labe
 /** Botones de opción única (rango, tipo de código, método de pago). */
 export function Segmented<T extends string>({ label, value, options, onChange, full }: { label: string; value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; full?: boolean }) {
   return (
-    <div className="seg" role="group" aria-label={label} style={full ? { display: "flex" } : undefined}>
+    <div className={`seg ${full ? "full" : ""}`} role="group" aria-label={label}>
       {options.map(([v, l]) => (
         <button type="button" key={v} aria-pressed={value === v} onClick={() => onChange(v)}>
           {l}
@@ -287,7 +287,7 @@ export function Preview({ data }: { data: any }) {
       {simples.length > 0 && (
         <dl className="kv">
           {simples.map(([k, v]) => (
-            <div key={k} style={{ display: "contents" }}>
+            <div key={k}>
               <dt>{label(k)}</dt>
               <dd className="num">{fmt(k, v)}</dd>
             </div>
