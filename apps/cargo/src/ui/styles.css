@@ -1,44 +1,43 @@
 /* Fuentes empaquetadas (subconjunto latino, SIL OFL; licencias en assets/fonts). */
 @font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900; src: url("./assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations"); }
-@font-face { font-family: "Space Grotesk"; font-style: normal; font-display: swap; font-weight: 600; src: url("./assets/fonts/space-grotesk-latin-600-normal.woff2") format("woff2"); }
-@font-face { font-family: "Space Grotesk"; font-style: normal; font-display: swap; font-weight: 700; src: url("./assets/fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 400; src: url("./assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 600; src: url("./assets/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); }
 
-/* Kromo Cargo — tokens (tema Aurora33: violeta #a335ee, Inter / Space Grotesk / JetBrains Mono). Día es el tema base; Noche se activa por preferencia del sistema o con data-theme="dark".
+/* Kromo Cargo — tokens (tema Aurora33: lima #aff33e, pizarra, Inter / JetBrains Mono). Día es el tema base; Noche se activa por preferencia del sistema o con data-theme="dark".
    Todos los pares de texto/fondo cumplen WCAG 2.2 AA (≥ 4.5:1 texto, ≥ 3:1 bordes de controles y foco);
    test/contraste.test.ts lo verifica leyendo este archivo. */
 :root {
   color-scheme: light;
-  --bg: #f9fafb;
+  --bg: #fbfcf8;
   --surface: #ffffff;
-  --surface-2: #eeeef0;
-  --sidebar: #f4f5f6;
-  --border: #e4e4e8;
-  --border-input: #7f7f87;
-  --text: #070709;
-  --text-2: #5d5d63;
-  --accent: #a335ee;
-  --accent-hover: #8f22d8;
-  --accent-strong: #8a1fd6;
-  --accent-soft: #f3e9fd;
-  --on-accent: #f9fafb;
-  --series-1: #a335ee;
-  --good: #0b7a24;
-  --good-soft: #e2f6e6;
-  --warn: #a83c00;
-  --warn-soft: #fff0e5;
-  --bad: #fe3248;
-  --bad-text: #c8102e;
-  --bad-soft: #ffebee;
-  --ia: #1f4fd1;
-  --ia-soft: #e8eefe;
-  --focus: #a335ee;
-  --overlay: rgb(7 7 9 / 0.45);
-  --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --surface-2: #f1f5f9;
+  --sidebar: #ffffff;
+  --border: #e2e8f0;
+  --border-input: #7a8799;
+  --text: #0f172a;
+  --text-2: #566579;
+  --accent: #aff33e;
+  --accent-hover: #9be22a;
+  --accent-strong: #166534;
+  --accent-soft: #f0fdf4;
+  --on-accent: #000000;
+  --series-1: #4d7c0f;
+  --series-fill: #aff33e;
+  --good: #15803d;
+  --good-soft: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --bad: #ef4444;
+  --bad-text: #c81e1e;
+  --bad-soft: #fef2f2;
+  --ia: #1d4ed8;
+  --ia-soft: #dbeafe;
+  --focus: #4d7c0f;
+  --overlay: rgb(2 6 23 / 0.45);
+  --shadow: 0 8px 20px 0 hsl(0 0% 0% / 0.05), 0 1px 2px -1px hsl(0 0% 0% / 0.05);
 
   --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font);
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Escala tipográfica (rem: respeta el tamaño de letra elegido en el navegador). Base 16 px. */
@@ -55,69 +54,71 @@
   --control: 2.5rem;    /* 40 px */
   --control-sm: 2.125rem; /* 34 px */
   --control-lg: 3.25rem;  /* 52 px */
-  --radius: 0.5rem;
-  --radius-sm: 0.375rem;
-  --radius-lg: 0.75rem;
+  --radius: 1rem;
+  --radius-sm: 0.75rem;
+  --radius-lg: 1.25rem;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #070709;
-    --surface: #111114;
-    --surface-2: #1a1a1e;
-    --sidebar: #070709;
-    --border: #26262a;
-    --border-input: #6e6e76;
-    --text: #f9fafb;
-    --text-2: #9e9ea3;
-    --accent: #a335ee;
-    --accent-hover: #8f22d8;
-    --accent-strong: #c88bf7;
-    --accent-soft: #241634;
-    --on-accent: #f9fafb;
-    --series-1: #b45cf2;
-    --good: #3fcf63;
-    --good-soft: #10291a;
-    --warn: #ff8f45;
-    --warn-soft: #33200f;
-    --bad: #fe3248;
-    --bad-text: #ff6b7b;
-    --bad-soft: #3a1219;
-    --ia: #7d9dff;
-    --ia-soft: #15203f;
-    --focus: #b45cf2;
+    --bg: #020617;
+    --surface: #0f172a;
+    --surface-2: #1e293b;
+    --sidebar: #020617;
+    --border: #1e293b;
+    --border-input: #64748b;
+    --text: #f8fafc;
+    --text-2: #94a3b8;
+    --accent: #aff33e;
+    --accent-hover: #9be22a;
+    --accent-strong: #aff33e;
+    --accent-soft: #14532d;
+    --on-accent: #000000;
+    --series-1: #aff33e;
+    --series-fill: #aff33e;
+    --good: #4ade80;
+    --good-soft: #0f2a1a;
+    --warn: #fbbf24;
+    --warn-soft: #33240a;
+    --bad: #ef4444;
+    --bad-text: #f87171;
+    --bad-soft: #3b1212;
+    --ia: #60a5fa;
+    --ia-soft: #12233f;
+    --focus: #aff33e;
     --overlay: rgb(0 0 0 / 0.6);
-    --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 2px 4px -1px hsl(0 0% 0% / 0.25);
+    --shadow: 0 10px 25px 0 hsl(0 0% 0% / 0.4), 0 1px 2px -1px hsl(0 0% 0% / 0.4);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #070709;
-  --surface: #111114;
-  --surface-2: #1a1a1e;
-  --sidebar: #070709;
-  --border: #26262a;
-  --border-input: #6e6e76;
-  --text: #f9fafb;
-  --text-2: #9e9ea3;
-  --accent: #a335ee;
-  --accent-hover: #8f22d8;
-  --accent-strong: #c88bf7;
-  --accent-soft: #241634;
-  --on-accent: #f9fafb;
-  --series-1: #b45cf2;
-  --good: #3fcf63;
-  --good-soft: #10291a;
-  --warn: #ff8f45;
-  --warn-soft: #33200f;
-  --bad: #fe3248;
-  --bad-text: #ff6b7b;
-  --bad-soft: #3a1219;
-  --ia: #7d9dff;
-  --ia-soft: #15203f;
-  --focus: #b45cf2;
+  --bg: #020617;
+  --surface: #0f172a;
+  --surface-2: #1e293b;
+  --sidebar: #020617;
+  --border: #1e293b;
+  --border-input: #64748b;
+  --text: #f8fafc;
+  --text-2: #94a3b8;
+  --accent: #aff33e;
+  --accent-hover: #9be22a;
+  --accent-strong: #aff33e;
+  --accent-soft: #14532d;
+  --on-accent: #000000;
+  --series-1: #aff33e;
+  --series-fill: #aff33e;
+  --good: #4ade80;
+  --good-soft: #0f2a1a;
+  --warn: #fbbf24;
+  --warn-soft: #33240a;
+  --bad: #ef4444;
+  --bad-text: #f87171;
+  --bad-soft: #3b1212;
+  --ia: #60a5fa;
+  --ia-soft: #12233f;
+  --focus: #aff33e;
   --overlay: rgb(0 0 0 / 0.6);
-  --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 2px 4px -1px hsl(0 0% 0% / 0.25);
+  --shadow: 0 10px 25px 0 hsl(0 0% 0% / 0.4), 0 1px 2px -1px hsl(0 0% 0% / 0.4);
 }
 
 /* ── Base ─────────────────────────────────────────────── */
@@ -125,12 +126,12 @@
 [hidden] { display: none !important; }
 html { font-size: 100%; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: var(--fs-base); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: var(--fs-base); line-height: 1.5; letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; }
 #root { height: 100%; }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; line-height: 1.25; }
-h1, h2, .kpi .v, .total .v, .brand-name { font-family: var(--font-display); letter-spacing: -0.01em; }
-h1 { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
+h1, h2, .kpi .v, .total .v, .brand-name { letter-spacing: -0.025em; }
+h1 { font-size: var(--fs-xl); font-weight: 700; }
 h2 { font-size: var(--fs-md); font-weight: 650; }
 h3 { font-size: var(--fs-sm); font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
 p { margin: 0; }
@@ -259,7 +260,7 @@ textarea.input { min-height: auto; resize: vertical; }
 input[type="checkbox"] { width: 1.125rem; height: 1.125rem; accent-color: var(--accent); margin: 0; flex: none; }
 
 /* ── Tarjetas y tablas ────────────────────────────────── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); min-width: 0; box-shadow: var(--shadow); }
 .cq { container-type: inline-size; }
 .card-pad { padding: 1rem; }
 .card-head { display: flex; align-items: center; gap: 0.5rem 0.75rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border); }
@@ -369,7 +370,8 @@ input[type="checkbox"] { width: 1.125rem; height: 1.125rem; accent-color: var(--
 .bars { display: flex; align-items: flex-end; gap: 2px; height: 11.25rem; border-bottom: 1px solid var(--border-input); position: relative; }
 .bar-hit { flex: 1; height: 100%; display: flex; align-items: flex-end; position: relative; border-radius: 4px 4px 0 0; }
 .bar-hit:focus-visible { outline-offset: 0; }
-.bar { width: 100%; max-width: 1.75rem; margin: 0 auto; background: var(--series-1); border-radius: 4px 4px 0 0; min-height: 1px; }
+/* Relleno con el color de marca y contorno de ≥ 3:1 contra el fondo (WCAG 1.4.11). */
+.bar { width: 100%; max-width: 1.75rem; margin: 0 auto; background: var(--series-fill); box-shadow: inset 0 0 0 1.5px var(--series-1); border-radius: 4px 4px 0 0; min-height: 1px; }
 .bar-hit:hover .bar, .bar-hit:focus-visible .bar { filter: brightness(1.12); }
 .gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); pointer-events: none; }
 .gridline span { position: absolute; right: 100%; top: -0.6rem; padding-right: 0.375rem; font-size: var(--fs-xs); color: var(--text-2); }
@@ -380,7 +382,7 @@ input[type="checkbox"] { width: 1.125rem; height: 1.125rem; accent-color: var(--
 .hbar > :first-child { flex: 0 0 7rem; min-width: 0; }
 .hbar .track { flex: 1 1 auto; min-width: 2rem; height: 0.625rem; }
 .hbar > :last-child { flex: none; text-align: right; }
-.hbar .fill { height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbar .fill { height: 100%; background: var(--series-fill); box-shadow: inset 0 0 0 1.5px var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
 details.data-table { padding: 0 1rem 1rem; }
 details.data-table summary { cursor: pointer; color: var(--accent-strong); font-weight: 600; font-size: var(--fs-sm); min-height: var(--control-sm); display: flex; align-items: center; }
 

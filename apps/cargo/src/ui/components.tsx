@@ -25,12 +25,12 @@ export function Logo({ className, titulo }: { className?: string; titulo?: strin
           <stop offset="1" stopColor="#262C36" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="14" fill="#070709" />
+      <rect width="64" height="64" rx="14" fill="#020617" />
       <path d="M32 10 52 21.5 32 33 12 21.5Z" fill={`url(#${id}t)`} />
       <path d="M12 21.5 32 33V55L12 43.5Z" fill={`url(#${id}l)`} />
       <path d="M52 21.5 32 33V55L52 43.5Z" fill={`url(#${id}r)`} />
-      <path d="M20.4 16.67 23.6 14.83 43.6 26.33V32.33L40.4 34.17V28.17Z" fill="#A335EE" />
-      <path d="M32 33V55M12 21.5 32 33 52 21.5" fill="none" stroke="#C88BF7" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M20.4 16.67 23.6 14.83 43.6 26.33V32.33L40.4 34.17V28.17Z" fill="#AFF33E" />
+      <path d="M32 33V55M12 21.5 32 33 52 21.5" fill="none" stroke="#AFF33E" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
   );
 }

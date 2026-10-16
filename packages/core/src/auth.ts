@@ -436,15 +436,15 @@ function html(body: string, status = 200): Response {
 
 // Mismos tokens que la UI de la app (tema Aurora33) (tema Día / Noche, contraste WCAG AA) y tamaños en rem con base de 16 px.
 const ESTILO = `
-  :root{color-scheme:light dark;--bg:#f9fafb;--s:#fff;--b:#e4e4e8;--bi:#7f7f87;--t:#070709;--t2:#5d5d63;--a:#a335ee;--oa:#f9fafb;--bad:#c8102e}
-  @media (prefers-color-scheme:dark){:root{--bg:#070709;--s:#111114;--b:#26262a;--bi:#6e6e76;--t:#f9fafb;--t2:#9e9ea3;--a:#a335ee;--oa:#f9fafb;--bad:#ff6b7b}}
+  :root{color-scheme:light dark;--bg:#fbfcf8;--s:#fff;--b:#e2e8f0;--bi:#7a8799;--t:#0f172a;--t2:#566579;--a:#aff33e;--oa:#000;--f:#4d7c0f;--bad:#c81e1e}
+  @media (prefers-color-scheme:dark){:root{--bg:#020617;--s:#0f172a;--b:#1e293b;--bi:#64748b;--t:#f8fafc;--t2:#94a3b8;--a:#aff33e;--oa:#000;--f:#aff33e;--bad:#f87171}}
   *{box-sizing:border-box}html{font-size:100%}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--t);font:1rem/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;padding:1rem}
-  .c{background:var(--s);border:1px solid var(--b);border-radius:.875rem;padding:1.75rem;width:min(26rem,100%);display:grid;gap:1rem}
+  .c{background:var(--s);border:1px solid var(--b);border-radius:1.25rem;box-shadow:0 8px 20px hsl(0 0% 0%/.05);padding:1.75rem;width:min(26rem,100%);display:grid;gap:1rem}
   .logo{width:3rem;height:3rem}.logo svg{display:block;width:100%;height:100%}h1{font-size:1.25rem;margin:0;line-height:1.3}p{margin:0;color:var(--t2)}b{color:var(--t)}
   label{font-size:.875rem;font-weight:600}
-  input{min-height:3.25rem;font-size:1.5rem;letter-spacing:.4em;text-align:center;border:1px solid var(--bi);border-radius:.625rem;background:var(--s);color:var(--t);width:100%}
-  :focus-visible{outline:3px solid var(--a);outline-offset:2px}
-  .r{display:flex;gap:.625rem;flex-wrap:wrap}button{flex:1 1 8rem;min-height:2.75rem;border-radius:.625rem;border:1px solid var(--bi);background:var(--s);color:var(--t);font-family:inherit;font-size:1rem;font-weight:600;cursor:pointer}
+  input{min-height:3.25rem;font-size:1.5rem;letter-spacing:.4em;text-align:center;border:1px solid var(--bi);border-radius:.75rem;background:var(--s);color:var(--t);width:100%}
+  :focus-visible{outline:3px solid var(--f);outline-offset:2px}
+  .r{display:flex;gap:.625rem;flex-wrap:wrap}button{flex:1 1 8rem;min-height:2.75rem;border-radius:.75rem;border:1px solid var(--bi);background:var(--s);color:var(--t);font-family:inherit;font-size:1rem;font-weight:600;cursor:pointer}
   button.p{background:var(--a);border-color:var(--a);color:var(--oa)}.e{color:var(--bad);font-weight:600}ul{margin:0;padding-left:1.25rem;color:var(--t2)}`;
 
 interface Marca {
