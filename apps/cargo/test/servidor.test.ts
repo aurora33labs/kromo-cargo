@@ -212,8 +212,15 @@ describe(`modo servidor (${MOTOR})`, () => {
     expect(html).toContain("claude-ai.example.net no es Claude ni ChatGPT");
   });
 
-  test("cabeceras de seguridad en la API y en el MCP", async () => {
+  test("cabeceras de seguridad en la UI, la API y el MCP", async () => {
+    const ui = await fetch(`${BASE}/`);
+    expect(ui.status).toBe(200);
+    expect(await ui.text()).toContain('<div id="root">');
+    expect(ui.headers.get("content-type")).toStartWith("text/html");
+    expect(ui.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    expect(ui.headers.get("content-security-policy")).toContain("script-src 'self'");
     for (const r of [
+      ui,
       await fetch(`${BASE}/api/acciones/resumen`, { method: "POST", headers: { ...H, cookie } }),
       await fetch(`${BASE}/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
     ]) {

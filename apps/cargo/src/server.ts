@@ -114,7 +114,26 @@ export async function startServer(app: App, opts: ServeOptions) {
   const api = createApiHandler(app.registry, { getActor, allowedHosts: modo.hosts });
   let mcpHttp: ((req: Request) => Promise<Response>) | null = null;
 
-  const handler = async (req: Request): Promise<Response> => conCabeceras(await manejar(req));
+  const hsts = modo.servidor && (modo.urlPublica ?? "").startsWith("https://");
+  const handler = async (req: Request): Promise<Response> => conCabeceras(await manejar(req), hsts);
+
+  // En producción Bun sirve el HTML de la UI en una ruta interna que no pasa por el handler (sin
+  // cabeceras). "/" lo pide una vez por loopback y lo sirve desde aquí con CSP y demás cabeceras.
+  // En desarrollo se queda en "/" para que funcione el recargado en caliente.
+  const desarrollo = !isCompiled && process.env.NODE_ENV !== "production" && !modo.servidor;
+  const rutaUi = desarrollo ? "/" : `/__ui-${crypto.randomUUID()}`;
+  let paginaUi: Promise<string> | undefined;
+  const servirUi = async () => {
+    paginaUi ??= fetch(`http://127.0.0.1:${server!.port}${rutaUi}`).then((r) => {
+      if (!r.ok) throw new Error(`UI ${r.status}`);
+      return r.text();
+    });
+    const html = await paginaUi.catch((e) => {
+      paginaUi = undefined;
+      throw e;
+    });
+    return new Response(html, { headers: { "content-type": "text/html;charset=utf-8", "cache-control": "no-cache", "content-security-policy": CSP_UI } });
+  };
 
   const manejar = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
@@ -124,6 +143,7 @@ export async function startServer(app: App, opts: ServeOptions) {
     if (p === "/icons/192.png" || p === "/icons/512.png") {
       return new Response(Bun.file(p === "/icons/192.png" ? icono192 : icono512), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
     }
+    if (p === "/" && rutaUi !== "/" && (req.method === "GET" || req.method === "HEAD")) return servirUi();
     if (p === "/salud") return json({ ok: true, version: VERSION, base_de_datos: app.db.dialect, modo: modo.servidor ? "servidor" : "local" });
 
     // MCP remoto y OAuth (solo en modo servidor; en local la IA usa stdio).
@@ -217,8 +237,8 @@ export async function startServer(app: App, opts: ServeOptions) {
       server = Bun.serve({
         hostname: modo.servidor ? "0.0.0.0" : "127.0.0.1",
         port,
-        development: !isCompiled && process.env.NODE_ENV !== "production" && !modo.servidor,
-        routes: { "/": ui },
+        development: desarrollo,
+        routes: { [rutaUi]: ui },
         fetch: handler,
       });
       break;
@@ -254,12 +274,28 @@ export async function startServer(app: App, opts: ServeOptions) {
   return { server: srv, url };
 }
 
-/** Cabeceras de seguridad para todo lo que sirve el handler (API, MCP, OAuth y archivos). */
-function conCabeceras(res: Response): Response {
+/** Política para la UI: solo recursos propios; fuentes e imágenes también como data:/blob:. */
+const CSP_UI = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+/** Cabeceras de seguridad para todo lo que sirve el handler (UI, API, MCP, OAuth y archivos). */
+function conCabeceras(res: Response, hsts: boolean): Response {
   const h = res.headers;
   if (!h.has("x-content-type-options")) h.set("x-content-type-options", "nosniff");
   if (!h.has("referrer-policy")) h.set("referrer-policy", "no-referrer");
   if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
+  if (!h.has("permissions-policy")) h.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  if (hsts && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=31536000");
   return res;
 }
 
