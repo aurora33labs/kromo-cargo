@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fechaLocal, money, qty, useData } from "../api.ts";
+import { EmptyState, Field, Segmented } from "../components.tsx";
 import { useVersion } from "../version.ts";
 
 const RANGOS = [
@@ -30,31 +31,64 @@ function BarrasPorDia({ filas, desde, hasta }: { filas: { grupo: string; importe
   const fmtDia = (f: string) => new Date(f + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" });
   const fmtEje = (f: string) => `${Number(f.slice(8))}/${Number(f.slice(5, 7))}`;
   const cada = Math.ceil(dias.length / 10);
+  const activo = hover !== null ? dias[hover] : null;
+  const total = dias.reduce((t, d) => t + d.importe, 0);
+  const mejor = dias.reduce((m, d) => (d.importe > m.importe ? d : m), dias[0]!);
   return (
-    <div className="chart" style={{ paddingLeft: 52 }}>
-      <div className="bars" role="img" aria-label="Ventas por día">
-        {[0.5, 1].map((t) => (
-          <div key={t} className="gridline" style={{ bottom: `${t * 100}%` }}>
-            <span className="num">{compact(max * t)}</span>
-          </div>
-        ))}
-        {dias.map((d, i) => (
-          <div key={d.fecha} className="bar-hit" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-            <div className="bar" style={{ height: `${(d.importe / max) * 100}%` }} />
-            {hover === i && (
-              <div className="tip num" style={{ left: "50%", bottom: `${(d.importe / max) * 100}%` }}>
-                <b>{fmtDia(d.fecha)}</b> · {money(d.importe)} · {d.ventas} ventas
-              </div>
-            )}
-          </div>
-        ))}
+    <>
+      <div className="chart">
+        <div
+          className="bars"
+          tabIndex={0}
+          role="group"
+          aria-roledescription="gráfica de barras"
+          aria-label={`Ventas por día: ${money(total)} en ${dias.length} días; el mejor fue ${fmtDia(mejor.fecha)} con ${money(mejor.importe)}. Usa las flechas para recorrer los días.`}
+          onKeyDown={(e) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+            e.preventDefault();
+            const n = dias.length - 1;
+            setHover((h) => (e.key === "Home" ? 0 : e.key === "End" ? n : h === null ? (e.key === "ArrowLeft" ? n : 0) : Math.max(0, Math.min(n, h + (e.key === "ArrowLeft" ? -1 : 1)))));
+          }}
+          onBlur={() => setHover(null)}
+        >
+          {[0.5, 1].map((t) => (
+            <div key={t} className="gridline" style={{ bottom: `${t * 100}%` }} aria-hidden>
+              <span className="num">{compact(max * t)}</span>
+            </div>
+          ))}
+          {dias.map((d, i) => (
+            <div key={d.fecha} className="bar-hit" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} aria-hidden>
+              <div className="bar" style={{ height: `${(d.importe / max) * 100}%`, filter: hover === i ? "brightness(1.15)" : undefined }} />
+              {hover === i && (
+                <div className="tip num" style={{ left: "50%", bottom: `${(d.importe / max) * 100}%` }}>
+                  <b>{fmtDia(d.fecha)}</b> · {money(d.importe)} · {d.ventas} ventas
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="xlabels" aria-hidden>
+          {dias.map((d, i) => (
+            <span key={d.fecha}>{i % cada === 0 ? fmtEje(d.fecha) : ""}</span>
+          ))}
+        </div>
+        <div className="sr-only" aria-live="polite">{activo ? `${fmtDia(activo.fecha)}: ${money(activo.importe)}, ${activo.ventas} ventas` : ""}</div>
       </div>
-      <div className="xlabels">
-        {dias.map((d, i) => (
-          <span key={d.fecha}>{i % cada === 0 ? fmtEje(d.fecha) : ""}</span>
-        ))}
-      </div>
-    </div>
+      <details className="data-table">
+        <summary>Ver como tabla</summary>
+        <div className="table-wrap">
+          <table className="table">
+            <caption className="sr-only">Ventas por día</caption>
+            <thead><tr><th scope="col">Día</th><th scope="col" className="r">Ventas</th><th scope="col" className="r">Importe</th></tr></thead>
+            <tbody>
+              {dias.map((d) => (
+                <tr key={d.fecha}><td>{fmtDia(d.fecha)}</td><td className="r num">{d.ventas}</td><td className="r num">{money(d.importe)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -80,26 +114,22 @@ export function Reportes() {
       <div className="page-head">
         <h1>Reportes</h1>
         <div className="spacer" />
-        <div className="seg">
-          {RANGOS.map((x) => (
-            <button key={x.id} className={rango === x.id ? "on" : ""} onClick={() => setRango(x.id)}>{x.label}</button>
-          ))}
-          <button className={rango === "custom" ? "on" : ""} onClick={() => setRango("custom")}>Rango</button>
-        </div>
+        <Segmented label="Periodo" value={rango} options={[...RANGOS.map((x) => [x.id, x.label] as const), ["custom", "Otro rango"] as const]} onChange={setRango} />
         {rango === "custom" && (
-          <div className="row">
-            <input type="date" className="input" style={{ width: 150 }} value={desdeC} onChange={(e) => setDesdeC(e.target.value)} />
-            <input type="date" className="input" style={{ width: 150 }} value={hastaC} onChange={(e) => setHastaC(e.target.value)} />
+          <div className="row" style={{ alignItems: "flex-end" }}>
+            <Field label="Desde"><input type="date" className="input" value={desdeC} max={hastaC} onChange={(e) => setDesdeC(e.target.value)} /></Field>
+            <Field label="Hasta"><input type="date" className="input" value={hastaC} min={desdeC} onChange={(e) => setHastaC(e.target.value)} /></Field>
           </div>
         )}
       </div>
 
-      <div className="kpis">
-        <div className="card kpi"><div className="l">Ventas</div><div className="v num">{money(t?.importe)}</div><div className="s">{t?.ventas ?? 0} tickets</div></div>
-        <div className="card kpi"><div className="l">Ticket promedio</div><div className="v num">{money(t?.ticket_promedio)}</div><div className="s">{qty(t?.unidades ?? 0)} unidades</div></div>
-        <div className="card kpi"><div className="l">Utilidad bruta estimada</div><div className="v num">{money(t?.utilidad_bruta_estimada)}</div><div className="s">Margen {t?.margen_porcentaje ?? 0}%</div></div>
-        <div className="card kpi"><div className="l">Inventario al costo</div><div className="v num">{money(valor.data?.total_costo)}</div><div className="s">{money(valor.data?.total_precio)} a precio de venta</div></div>
-      </div>
+      <h2 className="sr-only">Resumen del periodo</h2>
+      <dl className="kpis" style={{ margin: "0 0 1rem" }}>
+        <div className="card kpi"><dt className="l">Ventas</dt><dd className="v num" style={{ margin: 0 }}>{money(t?.importe)}</dd><dd className="s" style={{ margin: 0 }}>{t?.ventas ?? 0} tickets</dd></div>
+        <div className="card kpi"><dt className="l">Ticket promedio</dt><dd className="v num" style={{ margin: 0 }}>{money(t?.ticket_promedio)}</dd><dd className="s" style={{ margin: 0 }}>{qty(t?.unidades ?? 0)} unidades</dd></div>
+        <div className="card kpi"><dt className="l">Utilidad bruta estimada</dt><dd className="v num" style={{ margin: 0 }}>{money(t?.utilidad_bruta_estimada)}</dd><dd className="s" style={{ margin: 0 }}>Margen {t?.margen_porcentaje ?? 0}%</dd></div>
+        <div className="card kpi"><dt className="l">Inventario al costo</dt><dd className="v num" style={{ margin: 0 }}>{money(valor.data?.total_costo)}</dd><dd className="s" style={{ margin: 0 }}>{money(valor.data?.total_precio)} a precio de venta</dd></div>
+      </dl>
 
       <div className="cols">
         <div className="stack">
@@ -112,58 +142,62 @@ export function Reportes() {
           <div className="card">
             <div className="card-head"><h2>Más vendidos</h2></div>
             <table className="table">
-              <thead><tr><th>Producto</th><th className="r">Unidades</th><th className="r">Importe</th></tr></thead>
+              <thead><tr><th scope="col">Producto</th><th scope="col" className="r">Unidades</th><th scope="col" className="r">Importe</th></tr></thead>
               <tbody>
                 {dia.data?.top_productos.map((p: any) => (
                   <tr key={p.id}><td>{p.nombre}</td><td className="r num">{qty(p.unidades)}</td><td className="r num">{money(p.importe)}</td></tr>
                 ))}
               </tbody>
             </table>
-            {dia.data && !dia.data.top_productos.length && <div className="empty">Sin ventas en este periodo.</div>}
+            {dia.data && !dia.data.top_productos.length && <EmptyState action={<a className="btn" href="#/venta">Ir a Venta rápida</a>}>Sin ventas en este periodo.</EmptyState>}
           </div>
           <div className="card">
             <div className="card-head"><h2>Inventario por categoría</h2></div>
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Inventario por categoría">
             <table className="table">
-              <thead><tr><th>Categoría</th><th className="r">Productos</th><th className="r">Unidades</th><th className="r">Al costo</th><th className="r">A precio</th></tr></thead>
+              <thead><tr><th scope="col">Categoría</th><th scope="col" className="r">Productos</th><th scope="col" className="r">Unidades</th><th scope="col" className="r">Al costo</th><th scope="col" className="r">A precio</th></tr></thead>
               <tbody>
                 {valor.data?.por_categoria.map((c: any) => (
                   <tr key={c.categoria}><td>{c.categoria}</td><td className="r num">{c.productos}</td><td className="r num">{qty(c.unidades)}</td><td className="r num">{money(c.valor_costo)}</td><td className="r num muted">{money(c.valor_precio)}</td></tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 
         <div className="stack">
           <div className="card">
             <div className="card-head"><h2>Por método de pago</h2></div>
-            <div className="card-pad" style={{ paddingTop: 8 }}>
-              {metodo.data?.filas.map((f: any) => (
-                <div className="hbar" key={f.grupo} title={`${f.ventas} ventas`}>
-                  <span style={{ textTransform: "capitalize" }}>{f.grupo}</span>
-                  <div className="track"><div className="fill" style={{ width: `${(f.importe / maxMetodo) * 100}%` }} /></div>
-                  <span className="num r" style={{ textAlign: "right" }}>{money(f.importe)}</span>
-                </div>
-              ))}
-              {metodo.data && !metodo.data.filas.length && <div className="muted">Sin ventas.</div>}
+            <div className="card-pad" style={{ paddingTop: "0.5rem" }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {metodo.data?.filas.map((f: any) => (
+                  <li className="hbar" key={f.grupo}>
+                    <span style={{ textTransform: "capitalize" }}>{f.grupo}</span>
+                    <div className="track" aria-hidden><div className="fill" style={{ width: `${(f.importe / maxMetodo) * 100}%` }} /></div>
+                    <span className="num" style={{ textAlign: "right" }}>{money(f.importe)} <span className="muted small">· {f.ventas}</span><span className="sr-only"> ventas</span></span>
+                  </li>
+                ))}
+              </ul>
+              {metodo.data && !metodo.data.filas.length && <p className="muted">Sin ventas.</p>}
             </div>
           </div>
           <div className="card">
-            <div className="card-head"><h2>Por agotarse (7 días)</h2><div className="spacer" /><span className="badge warn">{bajo.data?.total ?? 0}</span></div>
+            <div className="card-head"><h2>Por agotarse (7 días)</h2><div className="spacer" /><span className="badge warn">{bajo.data?.total ?? 0}<span className="sr-only"> productos</span></span></div>
             <table className="table">
               <tbody>
                 {bajo.data?.productos.slice(0, 12).map((p: any) => (
                   <tr key={p.id}>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                      <div className="small muted">{p.dias_restantes === null ? p.motivo : p.dias_restantes === 0 ? "se acaba hoy" : `~${p.dias_restantes} días`} · pedir {p.sugerido_pedir}</div>
+                      <div className="strong">{p.nombre}</div>
+                      <div className="small muted">{p.dias_restantes === null ? p.motivo : p.dias_restantes === 0 ? "se acaba hoy" : `~${p.dias_restantes} ${p.dias_restantes === 1 ? "día" : "días"}`} · pedir {p.sugerido_pedir}</div>
                     </td>
-                    <td className="r"><span className={`badge ${p.stock <= 0 ? "bad" : "warn"} num`}>{qty(p.stock)}</span></td>
+                    <td className="r"><span className={`badge ${p.stock <= 0 ? "bad" : "warn"} num`}>{p.stock <= 0 ? "Agotado" : `quedan ${qty(p.stock)}`}</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {bajo.data && !bajo.data.total && <div className="empty">Todo bien surtido.</div>}
+            {bajo.data && !bajo.data.total && <EmptyState>Todo bien surtido.</EmptyState>}
           </div>
           <div className="card">
             <div className="card-head"><h2>Sin venta en 30 días</h2><div className="spacer" /><span className="muted small num">{money(quietos.data?.valor_detenido)} detenidos</span></div>
@@ -174,7 +208,7 @@ export function Reportes() {
                 ))}
               </tbody>
             </table>
-            {quietos.data && !quietos.data.total && <div className="empty">Todo se está moviendo.</div>}
+            {quietos.data && !quietos.data.total && <EmptyState>Todo se está moviendo.</EmptyState>}
           </div>
         </div>
       </div>

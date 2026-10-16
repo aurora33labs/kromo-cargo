@@ -29,5 +29,7 @@ jobs:
         run: bun test
         env:
           TEST_DATABASE_URL: postgres://kromo:kromo@localhost:5432/kromo
+      - name: Accesibilidad (WCAG 2.2 AA)
+        run: bunx playwright install --with-deps chromium && cd apps/cargo && bun test/e2e/a11y.ts
       - name: Compila el ejecutable
         run: bun run build && ./apps/cargo/dist/kromo-cargo version

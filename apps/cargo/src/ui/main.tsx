@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { login, logout, sesionInfo, ultimoCambio } from "./api.ts";
-import { ActionProvider, Icon, ToastProvider, useToast } from "./components.tsx";
+import { ActionProvider, Icon, Logo, ToastProvider, useToast } from "./components.tsx";
 import { Ajustes } from "./pages/Ajustes.tsx";
 import { Entradas } from "./pages/Entradas.tsx";
 import { Etiquetas } from "./pages/Etiquetas.tsx";
@@ -35,11 +35,52 @@ function usePage() {
   return page;
 }
 
+type Tema = "sistema" | "light" | "dark";
+const leerTema = (): Tema => {
+  try {
+    return (localStorage.getItem("kromo-tema") as Tema) || "sistema";
+  } catch {
+    return "sistema";
+  }
+};
+function aplicarTema(t: Tema) {
+  if (t === "sistema") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  try {
+    localStorage.setItem("kromo-tema", t);
+  } catch {}
+}
+aplicarTema(leerTema());
+
+function SelectorTema() {
+  const [tema, setTema] = useState<Tema>(leerTema);
+  const opciones: [Tema, string, string][] = [
+    ["sistema", "monitor", "Tema del sistema"],
+    ["light", "sun", "Tema Día"],
+    ["dark", "moon", "Tema Noche"],
+  ];
+  return (
+    <div className="theme-switch" role="group" aria-label="Tema de color">
+      {opciones.map(([t, icon, label]) => (
+        <button key={t} type="button" className="btn ghost icon" aria-label={label} title={label} aria-pressed={tema === t} onClick={() => (aplicarTema(t), setTema(t))}>
+          <Icon name={icon} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const PRINCIPALES = ["venta", "productos", "entradas", "reportes"];
+
 function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nombre: string; rol: string } | null; onLogout?: () => void }) {
   const page = usePage();
   const toast = useToast();
   const [version, setVersion] = useState(0);
+  const [mas, setMas] = useState(false);
   const last = useRef<number | null>(null);
+  const main = useRef<HTMLElement>(null);
+  const primera = useRef(true);
+  const actual = PAGES.find((p) => p.id === page) ?? PAGES[0];
 
   // Detecta cambios hechos por otros (la IA vía MCP o en otra pestaña) y refresca.
   useEffect(() => {
@@ -70,47 +111,86 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const Current = (PAGES.find((p) => p.id === page) ?? PAGES[0]).C;
+  // Al cambiar de sección: título de la pestaña y foco al encabezado (salvo que la sección ya enfocó su buscador).
+  useEffect(() => {
+    document.title = `${actual.label} · ${negocio} · Kromo Cargo`;
+    setMas(false);
+    if (primera.current) return void (primera.current = false);
+    requestAnimationFrame(() => {
+      if (main.current?.contains(document.activeElement)) return;
+      const h1 = main.current?.querySelector<HTMLElement>("h1");
+      if (h1) (h1.setAttribute("tabindex", "-1"), h1.focus());
+    });
+  }, [page, negocio]);
+
+  const Current = actual.C;
+  const enlace = (p: (typeof PAGES)[number]) => (
+    <a href={`#/${p.id}`} className="nav-item" aria-current={page === p.id ? "page" : undefined}>
+      <Icon name={p.icon} />
+      {p.label}
+      {p.kbd && <kbd className="nav-kbd" aria-label={`atajo ${p.kbd}`}>{p.kbd}</kbd>}
+    </a>
+  );
   return (
     <VersionCtx.Provider value={version}>
+      <a className="skip" href="#contenido" onClick={(e) => (e.preventDefault(), main.current?.focus())}>Saltar al contenido</a>
       <div className="shell">
-        <nav className="sidebar" aria-label="Secciones">
+        <aside className="sidebar">
           <div className="brand">
-            <div className="brand-logo">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinejoin="round">
-                <path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8" />
-              </svg>
-            </div>
+            <Logo className="brand-logo" />
             <div>
               <div className="brand-name">{negocio}</div>
               <div className="brand-sub">Kromo Cargo</div>
             </div>
           </div>
-          {PAGES.map((p) => (
-            <a key={p.id} href={`#/${p.id}`} className={`nav-item ${page === p.id ? "active" : ""}`}>
-              <Icon name={p.icon} />
-              {p.label}
-              {p.kbd && <span className="nav-kbd">{p.kbd}</span>}
-            </a>
-          ))}
+          <nav aria-label="Secciones">
+            <ul className="nav">
+              {PAGES.map((p) => <li key={p.id}>{enlace(p)}</li>)}
+            </ul>
+          </nav>
           <div className="sidebar-foot">
-            <span className="live">Conectado · cambios en vivo</span>
+            <span className="live">En vivo: ves los cambios de la IA al momento</span>
             {usuario && (
-              <span>
-                {usuario.nombre} ({usuario.rol === "dueno" ? "dueño" : "empleado"})
+              <div className="user-row">
+                <span>{usuario.nombre} · {usuario.rol === "dueno" ? "dueño" : "empleado"}</span>
                 {onLogout && (
-                  <>
-                    {" · "}
-                    <a href="#" onClick={(e) => (e.preventDefault(), onLogout())}>salir</a>
-                  </>
+                  <button className="btn ghost sm" onClick={onLogout}>
+                    <Icon name="logout" /> Salir
+                  </button>
                 )}
-              </span>
+              </div>
             )}
+            <SelectorTema />
           </div>
-        </nav>
-        <main className="main">
+        </aside>
+        <main className="main" id="contenido" ref={main} tabIndex={-1}>
           <Current key={page} />
         </main>
+        <nav className="bottom-nav" aria-label="Secciones">
+          {PAGES.filter((p) => PRINCIPALES.includes(p.id)).map((p) => (
+            <a key={p.id} href={`#/${p.id}`} aria-current={page === p.id ? "page" : undefined}>
+              <Icon name={p.icon} />
+              <span>{p.label.replace(" rápida", "")}</span>
+            </a>
+          ))}
+          <button type="button" aria-expanded={mas} aria-controls="menu-mas" aria-current={!PRINCIPALES.includes(actual.id) ? "page" : undefined} onClick={() => setMas((m) => !m)}>
+            <Icon name="more" />
+            <span>Más</span>
+          </button>
+          {mas && (
+            <ul className="more-menu nav" id="menu-mas">
+              {PAGES.filter((p) => !PRINCIPALES.includes(p.id)).map((p) => <li key={p.id}>{enlace(p)}</li>)}
+              {onLogout && (
+                <li>
+                  <button className="nav-item btn ghost" style={{ width: "100%", justifyContent: "flex-start" }} onClick={onLogout}>
+                    <Icon name="logout" /> Salir
+                  </button>
+                </li>
+              )}
+              <li style={{ padding: "0.25rem 0.75rem" }}><SelectorTema /></li>
+            </ul>
+          )}
+        </nav>
       </div>
     </VersionCtx.Provider>
   );
@@ -119,9 +199,15 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
 function Login({ negocio, onOk }: { negocio: string; onOk: () => void }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  useEffect(() => {
+    document.title = `Entrar · ${negocio} · Kromo Cargo`;
+  }, [negocio]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEnviando(true);
     const r = await login(pin);
+    setEnviando(false);
     if (r.ok) {
       onOk();
     } else {
@@ -130,15 +216,33 @@ function Login({ negocio, onOk }: { negocio: string; onOk: () => void }) {
     }
   };
   return (
-    <div className="login">
-      <form className="card" onSubmit={submit}>
-        <h1>{negocio}</h1>
-        <p className="muted" style={{ margin: 0 }}>Ingresa tu PIN</p>
-        <input className="input pin" type="password" inputMode="numeric" autoFocus value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={12} aria-label="PIN" />
-        {error && <span className="badge bad" style={{ justifySelf: "center" }}>{error}</span>}
-        <button className="btn primary lg" disabled={pin.length < 4}>Entrar</button>
+    <main className="login">
+      <form className="card" onSubmit={submit} aria-labelledby="login-titulo">
+        <Logo className="brand-logo" />
+        <div>
+          <h1 id="login-titulo">{negocio}</h1>
+          <p className="muted">Kromo Cargo</p>
+        </div>
+        <div className="field">
+          <label htmlFor="pin" className="field-label">Tu PIN</label>
+          <input
+            id="pin"
+            className="input pin"
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            autoFocus
+            value={pin}
+            onChange={(e) => (setPin(e.target.value.replace(/\D/g, "")), setError(""))}
+            maxLength={12}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "pin-error" : undefined}
+          />
+        </div>
+        <div role="alert" id="pin-error" className="field-error">{error}</div>
+        <button className="btn primary lg" disabled={pin.length < 4 || enviando}>{enviando ? "Entrando…" : "Entrar"}</button>
       </form>
-    </div>
+    </main>
   );
 }
 
@@ -151,10 +255,7 @@ function App() {
     window.addEventListener("sesion-expirada", on);
     return () => window.removeEventListener("sesion-expirada", on);
   }, []);
-  useEffect(() => {
-    if (info) document.title = `${info.negocio} · Kromo Cargo`;
-  }, [info]);
-  if (!info) return <div className="login muted">Cargando…</div>;
+  if (!info) return <div className="login muted" role="status">Cargando…</div>;
   if (info.requiere_pin && !info.usuario) return <Login negocio={info.negocio} onOk={refresh} />;
   return (
     <ToastProvider>
@@ -164,6 +265,12 @@ function App() {
     </ToastProvider>
   );
 }
+
+// El manifest lo sirve el servidor (ver server.ts); se enlaza aquí porque el bundler de HTML no conoce esa ruta.
+const manifest = document.createElement("link");
+manifest.rel = "manifest";
+manifest.href = "/manifest.webmanifest";
+document.head.append(manifest);
 
 // Si otra página carga la app dentro de un iframe (clickjacking), no se muestra.
 if (window.top !== window.self) document.body.textContent = "Kromo Cargo no se puede mostrar dentro de otra página.";

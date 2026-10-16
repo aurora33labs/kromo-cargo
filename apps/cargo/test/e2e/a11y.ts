@@ -1,0 +1,154 @@
+// Auditoría de accesibilidad (WCAG 2.2 AA) con axe-core y un navegador real.
+// Recorre todas las secciones en tema Día y Noche, un panel de producto, la confirmación en dos pasos,
+// el login (modo servidor) y el reflow a 320 px. Uso: bun test/e2e/a11y.ts  (CHROME_PATH opcional)
+import AxeBuilder from "@axe-core/playwright";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { chromium, type Page } from "playwright";
+
+const cli = resolve(import.meta.dir, "../../src/cli.ts");
+const PAGES = ["venta", "productos", "entradas", "reportes", "etiquetas", "importar", "historial", "ajustes"];
+const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+function arrancar(port: number, extra: Record<string, string> = {}) {
+  const env = { ...process.env, KROMO_DATA: mkdtempSync(join(tmpdir(), "kc-a11y-")), ...extra } as Record<string, string>;
+  Bun.spawnSync([process.execPath, cli, "demo"], { env });
+  return Bun.spawn([process.execPath, cli, "serve", "--no-open", "--port", String(port)], { env, stdout: "ignore", stderr: "ignore" });
+}
+
+const local = arrancar(4710);
+const servidor = arrancar(4711, { KROMO_MODO: "servidor", KROMO_PIN_INICIAL: "24681357" });
+await Bun.sleep(1500);
+
+const browser = await chromium.launch({ channel: "chromium", executablePath: process.env.CHROME_PATH });
+let fallas = 0;
+const nuevaPagina = async (opts: Parameters<typeof browser.newContext>[0]) => (await browser.newContext(opts)).newPage();
+
+async function auditar(page: Page, nombre: string) {
+  const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+  if (!r.violations.length) return console.log(`✓ ${nombre}`);
+  fallas += r.violations.length;
+  console.log(`✗ ${nombre}`);
+  for (const v of r.violations) {
+    console.log(`   [${v.impact}] ${v.id}: ${v.help}`);
+    for (const n of v.nodes.slice(0, 4)) console.log(`      ${n.target.join(" ")}  ${n.failureSummary?.split("\n")[1]?.trim() ?? ""}`);
+  }
+}
+
+try {
+  for (const tema of ["light", "dark"] as const) {
+    const page = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
+    for (const p of PAGES) {
+      await page.goto(`http://localhost:4710/#/${p}`);
+      await page.waitForTimeout(600);
+      await auditar(page, `${tema} · ${p}`);
+    }
+    // Panel de producto abierto.
+    await page.goto("http://localhost:4710/#/productos");
+    await page.waitForTimeout(600);
+    await page.locator("tbody tr").first().getByRole("button").first().click();
+    await page.waitForSelector("[role=dialog]");
+    await page.waitForTimeout(300);
+    await auditar(page, `${tema} · panel de producto`);
+    // Confirmación en dos pasos: conteo con un ajuste grande.
+    await page.getByRole("button", { name: "Conteo" }).click();
+    await page.getByLabel("Stock contado").fill("9999");
+    await page.getByRole("button", { name: "Registrar" }).click();
+    await page.waitForSelector("text=Confirma antes de aplicar", { timeout: 4000 }).catch(() => null);
+    await auditar(page, `${tema} · confirmación`);
+    await page.close();
+
+    const login = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
+    await login.goto("http://localhost:4711/");
+    await login.waitForTimeout(600);
+    await auditar(login, `${tema} · login`);
+    await login.close();
+  }
+
+  // Reflow (1.4.10): a 320 px de ancho no debe haber scroll horizontal de página.
+  const movil = await nuevaPagina({ viewport: { width: 320, height: 640 } });
+  for (const p of PAGES) {
+    await movil.goto(`http://localhost:4710/#/${p}`);
+    await movil.waitForTimeout(500);
+    const ancho = await movil.evaluate(() => document.documentElement.scrollWidth);
+    if (ancho > 320) (fallas++, console.log(`✗ reflow 320 px · ${p}: ancho ${ancho}px`));
+    else console.log(`✓ reflow 320 px · ${p}`);
+  }
+
+  // Texto al 200 % (1.4.4): sin scroll horizontal de página a 1280 px.
+  const zoom = await nuevaPagina({ viewport: { width: 1280, height: 800 } });
+  for (const p of PAGES) {
+    await zoom.goto(`http://localhost:4710/#/${p}`);
+    await zoom.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+    await zoom.waitForTimeout(400);
+    const ancho = await zoom.evaluate(() => document.documentElement.scrollWidth);
+    if (ancho > 1280) (fallas++, console.log(`✗ texto 200 % · ${p}: ancho ${ancho}px`));
+    else console.log(`✓ texto 200 % · ${p}`);
+  }
+
+  // Solo teclado (2.1.1, 2.4.3, 2.4.1).
+  const kb = await nuevaPagina({ viewport: { width: 1280, height: 800 } });
+  const enfocado = () => kb.evaluate(() => {
+    const a = document.activeElement as HTMLElement | null;
+    return a ? `${a.tagName}${a.getAttribute("aria-label") ? `[${a.getAttribute("aria-label")}]` : ""} ${a.textContent?.trim().slice(0, 40) ?? ""}` : "";
+  });
+  const paso = async (cond: unknown, msg: string) => (cond ? console.log(`✓ teclado · ${msg}`) : (fallas++, console.log(`✗ teclado · ${msg} (foco: ${await enfocado()})`)));
+
+  await kb.goto("http://localhost:4710/#/productos");
+  await kb.waitForTimeout(600);
+  await kb.keyboard.press("Tab");
+  await paso(await kb.evaluate(() => document.activeElement?.classList.contains("skip")), "el primer Tab llega a «Saltar al contenido»");
+  await kb.keyboard.press("Enter");
+  await paso(await kb.evaluate(() => document.activeElement?.id === "contenido"), "«Saltar al contenido» mueve el foco al contenido");
+
+  const nuevo = kb.getByRole("button", { name: "Nuevo producto" });
+  await nuevo.focus();
+  await kb.keyboard.press("Enter");
+  await kb.waitForSelector("[role=dialog]");
+  await paso(await kb.evaluate(() => !!document.activeElement?.closest("[role=dialog]")), "al abrir el panel, el foco entra al diálogo");
+  for (let i = 0; i < 40; i++) await kb.keyboard.press("Tab");
+  await paso(await kb.evaluate(() => !!document.activeElement?.closest("[role=dialog]")), "Tab no se sale del diálogo (foco atrapado)");
+  await kb.keyboard.press("Escape");
+  await kb.waitForTimeout(200);
+  await paso((await kb.locator("[role=dialog]").count()) === 0 && (await kb.evaluate(() => document.activeElement?.textContent?.includes("Nuevo producto"))), "Esc cierra y el foco regresa al botón que lo abrió");
+
+  const primerNombre = kb.locator("tbody .linklike").first();
+  await primerNombre.focus();
+  await kb.keyboard.press("Enter");
+  await paso(await kb.locator("[role=dialog]").count(), "un producto de la tabla se abre con Enter");
+  await kb.keyboard.press("Escape");
+
+  await kb.goto("http://localhost:4710/#/venta");
+  await kb.waitForTimeout(600);
+  await paso(await kb.evaluate(() => document.activeElement?.id === "venta-buscar"), "Venta rápida enfoca el buscador al entrar");
+  await kb.keyboard.type("7501055300075");
+  await kb.keyboard.press("Enter");
+  await kb.waitForSelector(".cline");
+  await kb.keyboard.press("F9");
+  const deshacer = kb.getByRole("button", { name: "Deshacer" });
+  await deshacer.waitFor();
+  await kb.waitForTimeout(7000);
+  await paso(await deshacer.isVisible(), "el aviso con «Deshacer» no desaparece solo (2.2.1)");
+  await deshacer.focus();
+  await kb.keyboard.press("Enter");
+  await kb.waitForSelector("text=Listo, se deshizo.");
+  await paso(true, "la venta se deshace desde el aviso con el teclado");
+
+  await kb.goto("http://localhost:4710/#/reportes");
+  await kb.waitForTimeout(800);
+  await kb.locator(".bars").focus();
+  await kb.keyboard.press("End");
+  await paso((await kb.locator(".chart [aria-live]").innerText()).includes("$"), "la gráfica se recorre con flechas y anuncia el día");
+
+  await kb.goto("http://localhost:4710/#/importar");
+  await kb.waitForTimeout(500);
+  await kb.getByLabel("Elegir archivo CSV o Excel para importar").focus();
+  await paso(await kb.evaluate(() => (document.activeElement as HTMLInputElement)?.type === "file"), "el selector de archivo para importar recibe foco");
+} finally {
+  await browser.close();
+  local.kill();
+  servidor.kill();
+}
+console.log(fallas ? `\n${fallas} problemas` : "\nSin violaciones WCAG 2.2 AA detectadas");
+process.exit(fallas ? 1 : 0);

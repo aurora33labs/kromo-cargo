@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { money, qty, upload, useData } from "../api.ts";
-import { Icon, Modal, StockBadge, Thumb, useAction, useToast, type ProductoLite } from "../components.tsx";
+import { EmptyState, Field, Icon, Modal, StockBadge, Thumb, useAction, useToast, type ProductoLite } from "../components.tsx";
 import { useVersion } from "../version.ts";
 
 export function Productos() {
@@ -26,40 +26,44 @@ export function Productos() {
           <Icon name="plus" /> Nuevo producto
         </button>
       </div>
-      <div className="row" style={{ marginBottom: 12 }}>
-        <input className="input" style={{ maxWidth: 320 }} placeholder="Buscar…" value={texto} onChange={(e) => setTexto(e.target.value)} />
-        <select className="select" style={{ maxWidth: 220 }} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          <option value="">Todas las categorías</option>
-          {cats.data?.filter((c) => c.categoria !== "Sin categoría").map((c) => (
-            <option key={c.categoria} value={c.categoria}>
-              {c.categoria} ({c.productos})
-            </option>
-          ))}
-        </select>
+      <div className="row" style={{ marginBottom: "0.75rem", alignItems: "flex-end" }} role="search" aria-label="Filtrar productos">
+        <Field label="Buscar" style={{ flex: "1 1 14rem", maxWidth: "22rem" }}>
+          <input className="input" type="search" placeholder="Nombre, SKU o código…" value={texto} onChange={(e) => setTexto(e.target.value)} />
+        </Field>
+        <Field label="Categoría" style={{ flex: "1 1 12rem", maxWidth: "16rem" }}>
+          <select className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <option value="">Todas</option>
+            {cats.data?.filter((c) => c.categoria !== "Sin categoría").map((c) => (
+              <option key={c.categoria} value={c.categoria}>
+                {c.categoria} ({c.productos})
+              </option>
+            ))}
+          </select>
+        </Field>
         <label className="check">
           <input type="checkbox" checked={soloBajo} onChange={(e) => setSoloBajo(e.target.checked)} /> Solo stock bajo
         </label>
       </div>
-      <div className="card" style={{ overflowX: "auto" }}>
+      <div className="card table-wrap" tabIndex={0} role="region" aria-label="Lista de productos">
         <table className="table">
           <thead>
             <tr>
-              <th>Producto</th>
-              <th>Categoría</th>
-              <th className="r">Precio</th>
-              <th className="r">Costo</th>
-              <th className="r">Margen</th>
-              <th className="r">Stock</th>
+              <th scope="col">Producto</th>
+              <th scope="col">Categoría</th>
+              <th scope="col" className="r">Precio</th>
+              <th scope="col" className="r">Costo</th>
+              <th scope="col" className="r">Margen</th>
+              <th scope="col" className="r">Stock</th>
             </tr>
           </thead>
           <tbody>
             {data?.productos.map((p) => (
-              <tr key={p.id} className="click" onClick={() => setAbierto(p.id)}>
+              <tr key={p.id} className="click" onClick={(e) => !(e.target as HTMLElement).closest("button") && setAbierto(p.id)}>
                 <td>
                   <div className="pcell">
                     <Thumb foto={p.foto} nombre={p.nombre} />
                     <div>
-                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                      <button type="button" className="linklike" onClick={() => setAbierto(p.id)}>{p.nombre}</button>
                       <div className="muted mono">{p.sku}{p.codigo_barras ? ` · ${p.codigo_barras}` : ""}</div>
                     </div>
                   </div>
@@ -75,7 +79,22 @@ export function Productos() {
             ))}
           </tbody>
         </table>
-        {data && !data.productos.length && <div className="empty">No hay productos. Crea uno o importa tu catálogo.</div>}
+        {data && !data.productos.length && (
+          texto || categoria || soloBajo ? (
+            <EmptyState>Ningún producto coincide con los filtros.</EmptyState>
+          ) : (
+            <EmptyState
+              action={
+                <div className="row" style={{ justifyContent: "center" }}>
+                  <button className="btn primary" onClick={() => setAbierto("nuevo")}><Icon name="plus" /> Crear producto</button>
+                  <a className="btn" href="#/importar">Importar catálogo</a>
+                </div>
+              }
+            >
+              Aún no hay productos. Crea el primero o importa tu catálogo de Excel.
+            </EmptyState>
+          )
+        )}
       </div>
       {abierto !== null && <ProductoPanel id={abierto === "nuevo" ? null : abierto} onClose={() => setAbierto(null)} onCreated={(id) => setAbierto(id)} />}
     </div>
@@ -179,18 +198,16 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
       }
     >
       {id && prod && (
-        <div className="row" style={{ alignItems: "flex-start", gap: 14 }}>
-          <label style={{ cursor: "pointer" }} title="Cambiar foto">
+        <div className="row" style={{ alignItems: "flex-start", gap: "1rem", flexWrap: "nowrap" }}>
+          <label className="photo-pick" title="Cambiar foto">
             {prod.foto ? (
-              <img src={prod.foto} alt="" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 10 }} />
+              <img src={prod.foto} alt={`Foto de ${prod.nombre}`} />
             ) : (
-              <div className="thumb" style={{ width: 96, height: 96, borderRadius: 10 }}>
-                <span style={{ width: 24, height: 24, display: "inline-flex" }}><Icon name="camera" /></span>
-              </div>
+              <span className="thumb"><Icon name="camera" /></span>
             )}
-            <input type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && subirFoto(e.target.files[0])} />
+            <input type="file" accept="image/*" className="file-input" aria-label={prod.foto ? "Cambiar foto" : "Agregar foto"} onChange={(e) => e.target.files?.[0] && subirFoto(e.target.files[0])} />
           </label>
-          <div className="stack" style={{ gap: 6, flex: 1 }}>
+          <div className="stack tight" style={{ flex: 1 }}>
             <div className="row">
               <StockBadge stock={prod.stock} minimo={prod.stock_minimo} />
               {!prod.activo && <span className="badge">Archivado</span>}
@@ -199,7 +216,7 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
               Vendidos en 30 días: <b>{qty(prod.ventas_30_dias.unidades)}</b> ({money(prod.ventas_30_dias.importe)})
             </div>
             <div className="row">
-              <button className="btn sm" onClick={() => setMov({ tipo: "entrada", cantidad: "", motivo: "", costo: "" })}>+ Entrada</button>
+              <button className="btn sm" onClick={() => setMov({ tipo: "entrada", cantidad: "", motivo: "", costo: "" })}><Icon name="plus" /> Entrada</button>
               <button className="btn sm" onClick={() => setMov({ tipo: "merma", cantidad: "", motivo: "", costo: "" })}>Merma</button>
               <button className="btn sm" onClick={() => setMov({ tipo: "conteo", cantidad: String(prod.stock), motivo: "Conteo físico", costo: "" })}>Conteo</button>
             </div>
@@ -208,23 +225,20 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
       )}
 
       {mov && (
-        <div className="card card-pad stack" style={{ gap: 10, background: "var(--surface-2)" }}>
-          <h3>{mov.tipo === "entrada" ? "Registrar entrada" : mov.tipo === "merma" ? "Registrar merma" : "Conteo físico"}</h3>
+        <div className="panel-inset" role="group" aria-labelledby="mov-titulo">
+          <h3 id="mov-titulo">{mov.tipo === "entrada" ? "Registrar entrada" : mov.tipo === "merma" ? "Registrar merma" : "Conteo físico"}</h3>
           <div className="grid2">
-            <label className="field">
-              <span>{mov.tipo === "conteo" ? "Stock contado" : "Cantidad"}</span>
+            <Field label={mov.tipo === "conteo" ? "Stock contado" : "Cantidad"}>
               <input className="input num" autoFocus inputMode="decimal" value={mov.cantidad} onChange={(e) => setMov({ ...mov, cantidad: e.target.value })} />
-            </label>
+            </Field>
             {mov.tipo === "entrada" ? (
-              <label className="field">
-                <span>Costo unitario (opcional)</span>
+              <Field label="Costo unitario" help="Opcional">
                 <input className="input num" inputMode="decimal" placeholder={String(prod?.costo ?? "")} value={mov.costo} onChange={(e) => setMov({ ...mov, costo: e.target.value })} />
-              </label>
+              </Field>
             ) : (
-              <label className="field">
-                <span>Motivo</span>
+              <Field label="Motivo" help="Al menos 3 letras">
                 <input className="input" value={mov.motivo} placeholder="Caducó, se rompió…" onChange={(e) => setMov({ ...mov, motivo: e.target.value })} />
-              </label>
+              </Field>
             )}
           </div>
           <div className="row" style={{ justifyContent: "flex-end" }}>
@@ -238,32 +252,37 @@ function ProductoPanel({ id, onClose, onCreated }: { id: number | null; onClose:
 
       <div className="grid2">
         {CAMPOS.map((c) => (
-          <label key={c.k} className="field" style={c.ancho === 2 ? { gridColumn: "1 / -1" } : undefined}>
-            <span>{c.label}</span>
+          <Field key={c.k} label={<>{c.label}{!id && (c.k === "nombre" || c.k === "precio") && <span aria-hidden> *</span>}</>} style={c.ancho === 2 ? { gridColumn: "1 / -1" } : undefined}>
             {c.tipo === "area" ? (
               <textarea className="input" rows={2} value={val(c.k)} onChange={(e) => set(c.k, e.target.value)} />
             ) : (
-              <input className={`input ${c.tipo === "num" ? "num" : ""}`} inputMode={c.tipo === "num" ? "decimal" : undefined} value={val(c.k)} onChange={(e) => set(c.k, e.target.value)} />
+              <input
+                className={`input ${c.tipo === "num" ? "num" : ""}`}
+                inputMode={c.tipo === "num" ? "decimal" : undefined}
+                required={!id && (c.k === "nombre" || c.k === "precio")}
+                value={val(c.k)}
+                onChange={(e) => set(c.k, e.target.value)}
+              />
             )}
-          </label>
+          </Field>
         ))}
         {!id && (
-          <label className="field">
-            <span>Stock inicial</span>
+          <Field label="Stock inicial">
             <input className="input num" inputMode="decimal" value={form.stock_inicial ?? ""} onChange={(e) => set("stock_inicial", e.target.value)} />
-          </label>
+          </Field>
         )}
       </div>
 
+      {!id && <p className="small muted">* Obligatorio</p>}
       {id && prod?.movimientos?.length > 0 && (
-        <div>
-          <h3 style={{ marginBottom: 6 }}>Últimos movimientos</h3>
-          <table className="table">
+        <div className="stack tight">
+          <h3 id="movs-titulo">Últimos movimientos</h3>
+          <table className="table" aria-labelledby="movs-titulo">
             <tbody>
               {prod.movimientos.map((m: any) => (
                 <tr key={m.id}>
                   <td><span className={`badge ${m.cantidad > 0 ? "good" : ""}`}>{m.tipo}</span></td>
-                  <td className="num r" style={{ fontWeight: 600 }}>{m.cantidad > 0 ? "+" : ""}{qty(m.cantidad)}</td>
+                  <td className="num r strong">{m.cantidad > 0 ? "+" : ""}{qty(m.cantidad)}</td>
                   <td className="small muted">{m.motivo ?? (m.venta_id ? `Venta #${m.venta_id}` : m.proveedor ?? "")}</td>
                   <td className="small muted r">{m.creado_en.slice(5, 16)}</td>
                 </tr>

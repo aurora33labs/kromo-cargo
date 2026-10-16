@@ -15,10 +15,29 @@ import { VERSION, mcpOptions, type App } from "./app.ts";
 import { establecerModo, type Modo } from "./config.ts";
 import { ahora, getConfig } from "./lib.ts";
 import ui from "./ui/index.html";
+import icono192 from "./ui/assets/icon-192.png" with { type: "file" };
+import icono512 from "./ui/assets/icon-512.png" with { type: "file" };
+import logoSvg from "./ui/assets/logo.svg" with { type: "text" };
 
 const ARCHIVOS = ["fotos", "etiquetas", "exportaciones"];
 const SUBIDAS_EXT = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".csv", ".txt", ".tsv", ".xlsx"];
 const FIRMA_TTL_S = 60 * 60;
+
+// Manifest de la app instalable (PWA). Va fuera del HTML porque el bundler de Bun no reescribe las rutas de sus íconos.
+const MANIFEST = JSON.stringify({
+  name: "Kromo Cargo",
+  short_name: "Cargo",
+  description: "Inventario y venta rápida para tu tienda, operado por personas y por IA.",
+  lang: "es-MX",
+  start_url: "/",
+  display: "standalone",
+  background_color: "#0D1014",
+  theme_color: "#0D1014",
+  icons: [
+    { src: "/icons/192.png", sizes: "192x192", type: "image/png" },
+    { src: "/icons/512.png", sizes: "512x512", type: "image/png" },
+  ],
+});
 
 export const isCompiled = import.meta.path.includes("$bunfs") || import.meta.path.includes("~BUN");
 
@@ -101,6 +120,10 @@ export async function startServer(app: App, opts: ServeOptions) {
     const url = new URL(req.url);
     const p = url.pathname;
 
+    if (p === "/manifest.webmanifest") return new Response(MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=86400" } });
+    if (p === "/icons/192.png" || p === "/icons/512.png") {
+      return new Response(Bun.file(p === "/icons/192.png" ? icono192 : icono512), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
+    }
     if (p === "/salud") return json({ ok: true, version: VERSION, base_de_datos: app.db.dialect, modo: modo.servidor ? "servidor" : "local" });
 
     // MCP remoto y OAuth (solo en modo servidor; en local la IA usa stdio).
@@ -212,7 +235,7 @@ export async function startServer(app: App, opts: ServeOptions) {
   ipDe = modo.servidor
     ? (req) => req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || srv.requestIP(req)?.address || "?"
     : (req) => srv.requestIP(req)?.address ?? "local";
-  auth = new Auth({ db: app.db, urlPublica: url, nombreApp: (await getConfig(app.db)).nombre_negocio ?? "Kromo Cargo", verificarPin });
+  auth = new Auth({ db: app.db, urlPublica: url, nombreApp: (await getConfig(app.db)).nombre_negocio ?? "Kromo Cargo", logoSvg, verificarPin });
   mcpHttp = createMcpHttpHandler(app.registry, mcpOptions(app), auth);
   if (modo.servidor) {
     app.registry.configurarArchivos({ rutasPermitidas: join(app.dataDir, "subidas"), urlArchivo: (rel) => `${url}${firmar(rel)}` });

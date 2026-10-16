@@ -37,9 +37,9 @@ Despliegue, variables y template: **[RAILWAY.md](RAILWAY.md)**. La imagen está 
 
 ```sh
 bun install
-bun test                         # 42 pruebas con SQLite: acciones, MCP, API, concurrencia, modo servidor y OAuth
+bun test                         # 107 pruebas con SQLite: acciones, MCP, API, concurrencia, modo servidor, OAuth y contraste de la UI
 bun run db:up                    # Postgres local en Docker (puerto 55440)
-bun run test:pg                  # las mismas 42 pruebas contra Postgres (una base nueva por prueba)
+bun run test:pg                  # las mismas pruebas contra Postgres (una base nueva por prueba)
 bun run typecheck
 cd apps/cargo
 bun src/cli.ts demo              # datos de demostración
@@ -56,7 +56,15 @@ Prueba end-to-end con navegador real + cliente MCP (requiere Chromium de Playwri
 bun test/e2e/flujo.ts            # CHROME_PATH=… si usas otro Chromium; SHOTS=carpeta para capturas
 DATABASE_URL=postgres://…/base_vacia bun test/e2e/flujo.ts   # lo mismo sobre Postgres
 bun test/e2e/remoto.ts https://<dominio> <PIN>               # verifica un despliegue en modo servidor
+bun test/e2e/a11y.ts             # auditoría WCAG 2.2 AA: axe en todas las pantallas (Día y Noche), teclado, reflow a 320 px y texto al 200 %
 ```
+
+### Accesibilidad y diseño
+
+La UI cumple WCAG 2.2 AA y `test/e2e/a11y.ts` lo verifica en cada cambio.
+- **Texto:** base de 16 px. Todos los tamaños están en `rem` (`--fs-*` en `src/ui/styles.css`), así que la UI escala con el tamaño de letra que elija la persona.
+- **Colores:** los tokens de los temas Día y Noche están en el mismo archivo, y `test/contraste.test.ts` comprueba que cada par texto/fondo cumpla el contraste mínimo.
+- **Logo:** está en `src/ui/assets/`: `logo.svg`, `favicon.svg` y los PNG para iOS y la app instalable.
 
 Contenedor local como en Railway:
 

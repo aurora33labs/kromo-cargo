@@ -7,3 +7,7 @@
 - Textos visibles (UI, errores, descripciones de herramientas MCP) en español de México.
 - El SQL debe correr igual en SQLite y Postgres: usa `ahora()`/`hoy()` como parámetros, `CAST(COUNT(*) AS INTEGER)`, `positivo()` y `db.insert()`. Antes de terminar corre `bun test` y `bun run test:pg` (requiere `bun run db:up`).
 - Usa `KROMO_DATA=/tmp/...` para no tocar los datos reales del usuario.
+- La UI debe cumplir WCAG 2.2 AA:
+  - Tamaños en `rem` con los tokens `--fs-*`, nunca `px` para texto. Colores solo con los tokens de `styles.css`.
+  - Cada control lleva label (usa `Field`) y todo debe funcionar con teclado.
+  - Si cambias la UI, corre `bun test/e2e/a11y.ts` en `apps/cargo`; debe salir sin violaciones.

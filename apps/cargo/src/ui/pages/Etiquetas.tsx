@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { money, useData } from "../api.ts";
-import { Icon, useAction, type ProductoLite } from "../components.tsx";
+import { Field, Icon, Segmented, useAction, type ProductoLite } from "../components.tsx";
 import { useVersion } from "../version.ts";
 
 export function Etiquetas() {
@@ -27,29 +27,30 @@ export function Etiquetas() {
       <div className="page-head">
         <h1>Etiquetas</h1>
         <div className="spacer" />
-        <span className="muted small">Hoja carta, 30 etiquetas de 2⅝" × 1" (tipo Avery 5160)</span>
+        <p className="hint">Hoja carta, 30 etiquetas de 2⅝" × 1" (tipo Avery 5160)</p>
       </div>
       <div className="cols">
         <div className="card">
           <div className="card-head">
-            <input className="input" placeholder="Filtrar productos…" value={texto} onChange={(e) => setTexto(e.target.value)} />
+            <label htmlFor="etq-filtro" className="sr-only">Filtrar productos</label>
+            <input id="etq-filtro" className="input" type="search" placeholder="Filtrar productos…" value={texto} onChange={(e) => setTexto(e.target.value)} />
           </div>
-          <div style={{ maxHeight: "65vh", overflow: "auto" }}>
+          <div style={{ maxHeight: "65vh", overflow: "auto" }} tabIndex={0} role="region" aria-label="Productos para etiquetar">
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 36 }}>
+                  <th scope="col" style={{ width: "2.75rem" }}>
                     <input type="checkbox" checked={todos} onChange={() => setSel(todos ? new Set() : new Set(visibles.map((p) => p.id)))} aria-label="Seleccionar todos" />
                   </th>
-                  <th>Producto</th>
-                  <th>Código</th>
-                  <th className="r">Precio</th>
+                  <th scope="col">Producto</th>
+                  <th scope="col">Código</th>
+                  <th scope="col" className="r">Precio</th>
                 </tr>
               </thead>
               <tbody>
                 {visibles.map((p) => (
-                  <tr key={p.id} className="click" onClick={() => toggle(p.id)}>
-                    <td><input type="checkbox" checked={sel.has(p.id)} readOnly /></td>
+                  <tr key={p.id} className="click" onClick={(e) => (e.target as HTMLElement).tagName !== "INPUT" && toggle(p.id)}>
+                    <td><input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Seleccionar ${p.nombre}`} /></td>
                     <td>{p.nombre}</td>
                     <td className="mono muted">{p.codigo_barras || p.sku}</td>
                     <td className="r num">{money(p.precio)}</td>
@@ -59,24 +60,20 @@ export function Etiquetas() {
             </table>
           </div>
         </div>
-        <div className="card card-pad stack" style={{ gap: 14 }}>
+        <div className="card card-pad stack">
           <div className="field">
-            <span>Tipo de código</span>
-            <div className="seg">
-              <button className={tipo === "qr" ? "on" : ""} onClick={() => setTipo("qr")} style={{ flex: 1 }}>QR</button>
-              <button className={tipo === "barras" ? "on" : ""} onClick={() => setTipo("barras")} style={{ flex: 1 }}>Código de barras</button>
-            </div>
+            <span className="field-label" aria-hidden>Tipo de código</span>
+            <Segmented label="Tipo de código" value={tipo} options={[["qr", "QR"], ["barras", "Código de barras"]] as const} onChange={setTipo} full />
           </div>
-          <label className="field">
-            <span>Copias por producto</span>
+          <Field label="Copias por producto">
             <input className="input num" type="number" min={1} max={100} value={copias} onChange={(e) => setCopias(Math.max(1, Math.min(100, Number(e.target.value) || 1)))} />
-          </label>
+          </Field>
           <label className="check"><input type="checkbox" checked={precio} onChange={(e) => setPrecio(e.target.checked)} /> Mostrar precio</label>
-          <p className="muted small" style={{ margin: 0 }}>
+          <p className="muted small">
             El código es el de barras del producto, o su SKU si no tiene. Un lector lo escanea directo en Venta rápida.
           </p>
           <button className="btn primary lg" disabled={!sel.size} onClick={() => generar({ ids: [...sel] })}>
-            <Icon name="download" /> Generar {sel.size ? sel.size * copias : ""} etiquetas
+            <Icon name="download" /> {sel.size ? `Generar ${sel.size * copias} etiquetas` : "Elige productos para generar"}
           </button>
           <button className="btn" onClick={() => generar({ solo_entradas_de_hoy: true })}>
             De lo que llegó hoy

@@ -4,62 +4,69 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kromo Cargo · tu tienda, operada por tu IA</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="theme-color" content="#F9FAFC" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0D1014" media="(prefers-color-scheme: dark)" />
   <meta name="description" content="Kromo Cargo: inventario y ventas para tienda física, gratis y en tu computadora. Se instala con un prompt y lo opera tu IA: Claude, Codex o Gemini." />
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f5f3; --surface: #fcfcfb; --surface-2: #efeee9; --border: #e3e2de;
-      --text: #0b0b0b; --text-2: #52514e; --text-3: #7c7b76;
-      --accent: #2a78d6; --accent-hover: #1f66bd; --accent-soft: #e6f0fb; --ia: #5b3fc4; --ia-soft: #eeeafd;
+      --bg: #f9fafc; --surface: #ffffff; --surface-2: #f2f3f6; --border: #e1e5eb; --border-input: #858c98;
+      --text: #232933; --text-2: #5d646f; --text-3: #5d646f;
+      --accent: #6b5fca; --accent-hover: #5a4eb8; --accent-strong: #5146a8; --accent-soft: #e4ecf9; --on-accent: #ffffff; --ia: #0d6f7a; --ia-soft: #dff3f4;
       --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
         color-scheme: dark;
-        --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #2e2e2b;
-        --text: #fff; --text-2: #c3c2b7; --text-3: #8f8e86;
-        --accent: #3987e5; --accent-hover: #5598ea; --accent-soft: #1b2b40; --ia: #a596f2; --ia-soft: #26213f;
+        --bg: #0d1014; --surface: #14181f; --surface-2: #1c222b; --border: #292e36; --border-input: #69717e;
+        --text: #dfe5ef; --text-2: #979fab; --text-3: #979fab;
+        --accent: #9690f1; --accent-hover: #aaa5f4; --accent-strong: #b3aef6; --accent-soft: #252e3d; --on-accent: #0d1014; --ia: #4fcfd9; --ia-soft: #12303a;
       }
     }
     :root[data-theme="dark"] {
       color-scheme: dark;
-      --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #2e2e2b;
-      --text: #fff; --text-2: #c3c2b7; --text-3: #8f8e86;
-      --accent: #3987e5; --accent-hover: #5598ea; --accent-soft: #1b2b40; --ia: #a596f2; --ia-soft: #26213f;
+      --bg: #0d1014; --surface: #14181f; --surface-2: #1c222b; --border: #292e36; --border-input: #69717e;
+      --text: #dfe5ef; --text-2: #979fab; --text-3: #979fab;
+      --accent: #9690f1; --accent-hover: #aaa5f4; --accent-strong: #b3aef6; --accent-soft: #252e3d; --on-accent: #0d1014; --ia: #4fcfd9; --ia-soft: #12303a;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    a { color: var(--accent-strong); }
+    .biz a.btn { color: var(--text); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 1rem/1.55 var(--font); -webkit-font-smoothing: antialiased; }
     .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
     header { display: flex; align-items: center; gap: 10px; padding: 20px 0; }
-    .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
-    header b { font-size: 17px; }
-    header .by { margin-left: auto; color: var(--text-3); font-size: 14px; }
+    .logo { width: 2.25rem; height: 2.25rem; display: block; flex: none; }
+    header b { font-size: 1.0625rem; }
+    header .by { margin-left: auto; color: var(--text-3); font-size: 0.875rem; }
     .hero { padding: 48px 0 32px; display: grid; gap: 20px; max-width: 760px; }
-    .eyebrow { display: inline-flex; gap: 8px; align-items: center; color: var(--ia); background: var(--ia-soft); padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; justify-self: start; }
-    h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.03em; margin: 0; }
-    .lead { font-size: 19px; color: var(--text-2); margin: 0; }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; color: var(--ia); background: var(--ia-soft); padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 0.875rem; justify-self: start; }
+    h1 { font-size: clamp(2.125rem, 6vw, 3.5rem); line-height: 1.05; letter-spacing: -0.03em; margin: 0; }
+    .lead { font-size: 1.1875rem; color: var(--text-2); margin: 0; }
     .prompt { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06); }
-    .prompt-label { font-size: 13px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
-    .prompt pre { margin: 0; white-space: pre-wrap; font: 15px/1.5 var(--mono); background: var(--surface-2); padding: 14px; border-radius: 10px; overflow-wrap: anywhere; }
+    .prompt-label { font-size: 0.8125rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+    .prompt pre { margin: 0; white-space: pre-wrap; font: 0.9375rem/1.5 var(--mono); background: var(--surface-2); padding: 14px; border-radius: 10px; overflow-wrap: anywhere; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 600 16px var(--font); cursor: pointer; text-decoration: none; }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 2.875rem; padding: 0.5rem 1.25rem; border-radius: 10px; border: 1px solid var(--border-input); background: var(--surface); color: var(--text); font: 600 1rem var(--font); cursor: pointer; text-decoration: none; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     .btn.primary:hover { background: var(--accent-hover); }
-    .hint { color: var(--text-3); font-size: 14px; }
+    .hint { color: var(--text-3); font-size: 0.875rem; }
     section { padding: 48px 0; }
-    h2 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 8px; }
+    h2 { font-size: 1.875rem; letter-spacing: -0.02em; margin: 0 0 8px; }
     .sub { color: var(--text-2); margin: 0 0 28px; max-width: 640px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-    .card h3 { margin: 0 0 6px; font-size: 17px; }
-    .card p { margin: 0; color: var(--text-2); font-size: 15px; }
-    .step { font: 700 13px var(--mono); color: var(--accent); margin-bottom: 8px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.0625rem; }
+    .card p { margin: 0; color: var(--text-2); font-size: 0.9375rem; }
+    .step { font: 700 0.8125rem var(--mono); color: var(--accent-strong); margin-bottom: 8px; }
     .chat { display: grid; gap: 10px; }
-    .msg { padding: 12px 14px; border-radius: 12px; max-width: 520px; font-size: 15px; }
-    .msg.yo { background: var(--accent); color: #fff; justify-self: end; border-bottom-right-radius: 4px; }
+    .msg { padding: 12px 14px; border-radius: 12px; max-width: 520px; font-size: 0.9375rem; }
+    .msg.yo { background: var(--accent); color: var(--on-accent); justify-self: end; border-bottom-right-radius: 4px; }
     .msg.ia { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
     .msg.ia small { display: block; color: var(--ia); font-weight: 600; margin-bottom: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 8px; }
     td, th { text-align: left; padding: 6px 0; border-bottom: 1px solid var(--border); }
     td.r, th.r { text-align: right; }
     .biz { background: var(--text); color: var(--bg); border-radius: 20px; padding: 36px; display: grid; gap: 16px; }
@@ -71,7 +78,7 @@
     summary { font-weight: 600; cursor: pointer; }
     details p { color: var(--text-2); margin: 10px 0 0; }
     code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
-    footer { padding: 40px 0; color: var(--text-3); font-size: 14px; border-top: 1px solid var(--border); margin-top: 32px; }
+    footer { padding: 40px 0; color: var(--text-3); font-size: 0.875rem; border-top: 1px solid var(--border); margin-top: 32px; }
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
     .toast.on { opacity: 1; }
     @media (max-width: 640px) { .biz { padding: 24px; } section { padding: 36px 0; } }
@@ -80,18 +87,37 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></div>
+      <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">
+  <defs>
+    <linearGradient id="kc-top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="0.55" stop-color="#DCE1EA"/><stop offset="1" stop-color="#AEB6C4"/>
+    </linearGradient>
+    <linearGradient id="kc-left" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#C9CFDA"/><stop offset="0.45" stop-color="#8B94A4"/><stop offset="0.5" stop-color="#E9EDF3"/><stop offset="0.62" stop-color="#7C8596"/><stop offset="1" stop-color="#555D6C"/>
+    </linearGradient>
+    <linearGradient id="kc-right" x1="1" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#6A7383"/><stop offset="1" stop-color="#262C36"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0D1014"/>
+  <path d="M32 10 52 21.5 32 33 12 21.5Z" fill="url(#kc-top)"/>
+  <path d="M12 21.5 32 33V55L12 43.5Z" fill="url(#kc-left)"/>
+  <path d="M52 21.5 32 33V55L52 43.5Z" fill="url(#kc-right)"/>
+  <path d="M20.4 16.67 23.6 14.83 43.6 26.33V32.33L40.4 34.17V28.17Z" fill="#6B5FCA"/>
+  <path d="M32 33V55M12 21.5 32 33 52 21.5" fill="none" stroke="#9690F1" stroke-width="1.6" stroke-linejoin="round"/>
+</svg>
       <b>Kromo Cargo</b>
       <span class="by">una herramienta gratuita de Kromo, por Aurora33</span>
     </header>
 
+    <main>
     <div class="hero">
       <span class="eyebrow">✦ App + IA, gratis y en tu computadora</span>
       <h1>Tu tienda, operada por tu IA.</h1>
       <p class="lead">Inventario, venta rápida, etiquetas QR y reportes para tu tienda física. Tus datos se quedan en tu compu, y Claude, Codex o Gemini lo manejan por ti.</p>
       <div class="prompt">
-        <span class="prompt-label">Copia esto y pégalo en Claude Code, Codex o tu agente con terminal</span>
-        <pre id="prompt">Instala Kromo Cargo de Aurora33 siguiendo las instrucciones de https://kromo.aurora33.app/install/cargo.md. Antes de ejecutar cualquier comando, explícame qué hará y pídeme confirmación.</pre>
+        <span class="prompt-label" id="prompt-label">Copia esto y pégalo en Claude Code, Codex o tu agente con terminal</span>
+        <pre id="prompt" tabindex="0" aria-labelledby="prompt-label">Instala Kromo Cargo de Aurora33 siguiendo las instrucciones de https://kromo.aurora33.app/install/cargo.md. Antes de ejecutar cualquier comando, explícame qué hará y pídeme confirmación.</pre>
         <div class="row">
           <button class="btn primary" id="copiar">Copiar prompt</button>
           <a class="btn" href="install/cargo.md">Ver qué hace el instalador</a>
@@ -116,7 +142,7 @@
       <div class="chat">
         <div class="msg yo">¿Qué se me va a acabar esta semana? Arma el pedido por proveedor.</div>
         <div class="msg ia"><small>✦ Claude · kromo-cargo</small>Son 5 productos. El más urgente es el queso panela (unos 3 días).
-          <table><tr><th>Proveedor</th><th>Producto</th><th class="r">Pedir</th></tr>
+          <table><tr><th scope="col">Proveedor</th><th scope="col">Producto</th><th scope="col" class="r">Pedir</th></tr>
             <tr><td>Lala</td><td>Queso panela 400 g</td><td class="r">9</td></tr>
             <tr><td>Danone</td><td>Yogur fresa 1 kg</td><td class="r">9</td></tr>
             <tr><td>Verde Valle</td><td>Arroz 1 kg</td><td class="r">12</td></tr></table>
@@ -161,9 +187,10 @@
       <details><summary>¿Y si la IA se equivoca?</summary><p>Todo queda en el historial con el nombre de quien lo hizo (persona o IA) y se puede deshacer. Los cambios grandes siempre piden confirmación con vista previa.</p></details>
     </section>
 
+    </main>
     <footer>Kromo Cargo es gratis y su código está a la vista (<a href="https://polyformproject.org/licenses/shield/1.0.0">PolyForm Shield</a>). Hecho en México por Aurora33.</footer>
   </div>
-  <div class="toast" id="toast">Prompt copiado</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script>
     document.getElementById("copiar").addEventListener("click", async () => {
       const text = document.getElementById("prompt").innerText;
@@ -171,7 +198,7 @@
         const r = document.createRange(); r.selectNodeContents(document.getElementById("prompt"));
         const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand("copy");
       }
-      const t = document.getElementById("toast"); t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1600);
+      const t = document.getElementById("toast"); t.textContent = "Prompt copiado"; t.classList.add("on"); setTimeout(() => (t.classList.remove("on"), (t.textContent = "")), 2500);
     });
   </script>
 </body>

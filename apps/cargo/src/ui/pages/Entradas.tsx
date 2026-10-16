@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { money, qty } from "../api.ts";
-import { Icon, ProductPicker, useAction, type ProductoLite } from "../components.tsx";
+import { EmptyState, Field, Icon, ProductPicker, useAction, type ProductoLite } from "../components.tsx";
 
 interface Linea {
   p: ProductoLite;
@@ -47,35 +47,36 @@ export function Entradas() {
         <div className="card">
           <div className="card-head">
             <div style={{ flex: 1 }}>
-              <ProductPicker onPick={agregar} autoFocus placeholder="Escanea o busca el producto que llegó…" />
+              <ProductPicker onPick={agregar} autoFocus label="Producto que llegó" placeholder="Escanea o busca el producto que llegó…" />
             </div>
           </div>
-          <table className="table">
+          <div className="table-wrap">
+          <table className="table" hidden={!lineas.length}>
             <thead>
               <tr>
-                <th>Producto</th>
-                <th className="r">Stock actual</th>
-                <th style={{ width: 110 }}>Cantidad</th>
-                <th style={{ width: 120 }}>Costo unit.</th>
-                <th />
+                <th scope="col">Producto</th>
+                <th scope="col" className="r">Stock actual</th>
+                <th scope="col" style={{ width: "7rem" }}>Cantidad</th>
+                <th scope="col" style={{ width: "8rem" }}>Costo unit.</th>
+                <th scope="col"><span className="sr-only">Quitar</span></th>
               </tr>
             </thead>
             <tbody>
               {lineas.map((l, i) => (
                 <tr key={l.p.id}>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{l.p.nombre}</div>
+                    <div className="strong">{l.p.nombre}</div>
                     <div className="muted mono">{l.p.sku}</div>
                   </td>
                   <td className="r num">{qty(l.p.stock)}</td>
                   <td>
-                    <input className="input num" inputMode="decimal" autoFocus value={l.cantidad} onChange={(e) => upd(i, "cantidad", e.target.value)} />
+                    <input className="input num" inputMode="decimal" autoFocus value={l.cantidad} onChange={(e) => upd(i, "cantidad", e.target.value)} aria-label={`Cantidad de ${l.p.nombre}`} />
                   </td>
                   <td>
-                    <input className="input num" inputMode="decimal" value={l.costo} onChange={(e) => upd(i, "costo", e.target.value)} />
+                    <input className="input num" inputMode="decimal" value={l.costo} onChange={(e) => upd(i, "costo", e.target.value)} aria-label={`Costo unitario de ${l.p.nombre}`} />
                   </td>
                   <td>
-                    <button className="btn ghost sm" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))} aria-label="Quitar">
+                    <button className="btn ghost icon" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))} aria-label={`Quitar ${l.p.nombre}`}>
                       <Icon name="x" />
                     </button>
                   </td>
@@ -83,19 +84,18 @@ export function Entradas() {
               ))}
             </tbody>
           </table>
-          {!lineas.length && <div className="empty">Agrega los productos que llegaron. El costo se actualiza si cambia.</div>}
+          </div>
+          {!lineas.length && <EmptyState>Escanea o busca los productos que llegaron. Si el costo cambió, se actualiza.</EmptyState>}
         </div>
         <div className="stack">
-          <div className="card card-pad stack" style={{ gap: 12 }}>
-            <label className="field">
-              <span>Proveedor</span>
-              <input className="input" value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Opcional" />
-            </label>
-            <label className="field">
-              <span>Nota / factura</span>
-              <input className="input" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Opcional" />
-            </label>
-            <div className="total">
+          <div className="card card-pad stack">
+            <Field label="Proveedor" help="Opcional">
+              <input className="input" value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
+            </Field>
+            <Field label="Nota o factura" help="Opcional">
+              <input className="input" value={nota} onChange={(e) => setNota(e.target.value)} />
+            </Field>
+            <div className="total" aria-live="polite">
               <span className="muted">{validas.length} productos · {qty(validas.reduce((s, l) => s + Number(l.cantidad), 0))} unidades</span>
               <b className="num">{money(total)}</b>
             </div>
@@ -104,8 +104,8 @@ export function Entradas() {
             </button>
           </div>
           {ultima && (
-            <div className="card card-pad stack" style={{ gap: 10 }}>
-              <span>¿Imprimir etiquetas de lo que llegó?</span>
+            <div className="card card-pad stack tight">
+              <p>¿Imprimir etiquetas de lo que llegó?</p>
               <button
                 className="btn"
                 onClick={async () => {

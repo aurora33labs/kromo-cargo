@@ -1,5 +1,39 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { call, get, money, qty, type ExecResult } from "./api.ts";
+
+// ── Logo (caja cromada) ─────────────────────────────────────────────
+/** Marca de Kromo Cargo. Los ids de los degradados son únicos por instancia para poder repetirla en la página. */
+export function Logo({ className, titulo }: { className?: string; titulo?: string }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg className={className} viewBox="0 0 64 64" role={titulo ? "img" : undefined} aria-label={titulo} aria-hidden={titulo ? undefined : true}>
+      <defs>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="0.55" stopColor="#DCE1EA" />
+          <stop offset="1" stopColor="#AEB6C4" />
+        </linearGradient>
+        <linearGradient id={`${id}l`} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#C9CFDA" />
+          <stop offset="0.45" stopColor="#8B94A4" />
+          <stop offset="0.5" stopColor="#E9EDF3" />
+          <stop offset="0.62" stopColor="#7C8596" />
+          <stop offset="1" stopColor="#555D6C" />
+        </linearGradient>
+        <linearGradient id={`${id}r`} x1="1" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#6A7383" />
+          <stop offset="1" stopColor="#262C36" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="14" fill="#0D1014" />
+      <path d="M32 10 52 21.5 32 33 12 21.5Z" fill={`url(#${id}t)`} />
+      <path d="M12 21.5 32 33V55L12 43.5Z" fill={`url(#${id}l)`} />
+      <path d="M52 21.5 32 33V55L52 43.5Z" fill={`url(#${id}r)`} />
+      <path d="M20.4 16.67 23.6 14.83 43.6 26.33V32.33L40.4 34.17V28.17Z" fill="#6B5FCA" />
+      <path d="M32 33V55M12 21.5 32 33 52 21.5" fill="none" stroke="#9690F1" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 // ── Íconos (trazos simples, 24×24) ─────────────────────────────────
 const paths: Record<string, string> = {
@@ -18,11 +52,20 @@ const paths: Record<string, string> = {
   ia: "M12 2l1.8 4.7L18.5 8.5l-4.7 1.8L12 15l-1.8-4.7L5.5 8.5l4.7-1.8zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z",
   download: "M12 3v12m0 0l-4-4m4 4l4-4M4 21h16",
   camera: "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  check: "M20 6L9 17l-5-5",
+  alert: "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  ban: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM4.9 4.9l14.2 14.2",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  copy: "M9 9h11v11H9zM5 15H4V4h11v1",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
+  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
+  monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
 };
 
 export function Icon({ name }: { name: keyof typeof paths | string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false">
       <path d={paths[name] ?? ""} />
     </svg>
   );
@@ -38,58 +81,185 @@ interface Toast {
 const ToastCtx = createContext<(t: Omit<Toast, "id">) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
 
+/** Un aviso. Los que tienen acción (p. ej. Deshacer) no se cierran solos; el resto espera 6 s y se pausa con el mouse o el foco (WCAG 2.2.1). */
+function ToastItem({ t, cerrar }: { t: Toast; cerrar: () => void }) {
+  const [pausa, setPausa] = useState(false);
+  useEffect(() => {
+    if (t.action || pausa) return;
+    const timer = setTimeout(cerrar, 6000);
+    return () => clearTimeout(timer);
+  }, [t.action, pausa, cerrar]);
+  return (
+    <div
+      className={`toast ${t.kind ?? ""}`}
+      onMouseEnter={() => setPausa(true)}
+      onMouseLeave={() => setPausa(false)}
+      onFocus={() => setPausa(true)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setPausa(false)}
+    >
+      <div className="msg">{t.msg}</div>
+      {t.action && (
+        <button
+          className="btn sm"
+          onClick={() => {
+            t.action!.onClick();
+            cerrar();
+          }}
+        >
+          {t.action.label}
+        </button>
+      )}
+      <button className="btn ghost icon" onClick={cerrar} aria-label="Cerrar aviso">
+        <Icon name="x" />
+      </button>
+    </div>
+  );
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = useCallback((t: Omit<Toast, "id">) => {
-    const id = Math.random();
-    setToasts((ts) => [...ts.slice(-3), { ...t, id }]);
-    setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), t.action ? 9000 : 5000);
-  }, []);
+  const push = useCallback((t: Omit<Toast, "id">) => setToasts((ts) => [...ts.slice(-3), { ...t, id: Math.random() }]), []);
+  const cerradores = useRef(new Map<number, () => void>());
+  const cerrar = (id: number) => {
+    if (!cerradores.current.has(id)) cerradores.current.set(id, () => (setToasts((ts) => ts.filter((x) => x.id !== id)), cerradores.current.delete(id)));
+    return cerradores.current.get(id)!;
+  };
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.kind ?? ""}`}>
-            <div className="msg">{t.msg}</div>
-            {t.action && (
-              <button
-                className="btn sm"
-                onClick={() => {
-                  t.action!.onClick();
-                  setToasts((ts) => ts.filter((x) => x.id !== t.id));
-                }}
-              >
-                {t.action.label}
-              </button>
-            )}
-          </div>
-        ))}
+      <div className="toasts">
+        <div role="alert">
+          {toasts.filter((t) => t.kind === "error").map((t) => <ToastItem key={t.id} t={t} cerrar={cerrar(t.id)} />)}
+        </div>
+        <div role="status">
+          {toasts.filter((t) => t.kind !== "error").map((t) => <ToastItem key={t.id} t={t} cerrar={cerrar(t.id)} />)}
+        </div>
       </div>
     </ToastCtx.Provider>
   );
 }
 
 // ── Modal ───────────────────────────────────────────────────────────
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+const pilaModales: symbol[] = [];
+
+/** Diálogo modal: foco atrapado, Esc cierra, el foco regresa al elemento que lo abrió. */
 export function Modal(props: { title: ReactNode; onClose: () => void; children: ReactNode; footer?: ReactNode; side?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const onClose = useRef(props.onClose);
+  onClose.current = props.onClose;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [props.onClose]);
+    const yo = Symbol();
+    pilaModales.push(yo);
+    const anterior = document.activeElement as HTMLElement | null;
+    const node = ref.current!;
+    const focusables = () => [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+    if (!node.contains(document.activeElement)) (focusables()[0] ?? node).focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (pilaModales.at(-1) !== yo) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onClose.current();
+      } else if (e.key === "Tab") {
+        const f = focusables();
+        if (!f.length) return e.preventDefault();
+        const [primero, ultimo] = [f[0]!, f[f.length - 1]!];
+        if (e.shiftKey && (document.activeElement === primero || !node.contains(document.activeElement))) (e.preventDefault(), ultimo.focus());
+        else if (!e.shiftKey && (document.activeElement === ultimo || !node.contains(document.activeElement))) (e.preventDefault(), primero.focus());
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      pilaModales.splice(pilaModales.indexOf(yo), 1);
+      if (!pilaModales.length) document.body.style.overflow = overflow;
+      if (anterior?.isConnected) anterior.focus();
+    };
+  }, []);
   return (
     <div className={`overlay ${props.side ? "side" : ""}`} onMouseDown={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
         <div className="modal-head">
-          <h2>{props.title}</h2>
-          <div className="spacer" />
-          <button className="btn ghost sm" onClick={props.onClose} aria-label="Cerrar">
+          <h2 id={titleId}>{props.title}</h2>
+          <button className="btn ghost icon" onClick={props.onClose} aria-label="Cerrar">
             <Icon name="x" />
           </button>
         </div>
         <div className="modal-body">{props.children}</div>
         {props.footer && <div className="modal-foot">{props.footer}</div>}
       </div>
+    </div>
+  );
+}
+
+// ── Formularios ─────────────────────────────────────────────────────
+/** Campo con label visible asociado, ayuda y error ligados por aria-describedby. */
+export function Field({ label, help, error, children, style, className }: { label: ReactNode; help?: ReactNode; error?: ReactNode; children: ReactElement<any>; style?: CSSProperties; className?: string }) {
+  const id = useId();
+  const helpId = help ? `${id}-ayuda` : undefined;
+  const errId = error ? `${id}-error` : undefined;
+  const describedby = [helpId, errId].filter(Boolean).join(" ") || undefined;
+  return (
+    <div className={`field ${className ?? ""}`} style={style}>
+      <label htmlFor={id} className="field-label">{label}</label>
+      {cloneElement(children, { id, "aria-describedby": describedby, "aria-invalid": error ? true : undefined })}
+      {help && <span id={helpId} className="field-help">{help}</span>}
+      {error && <span id={errId} className="field-error">{error}</span>}
+    </div>
+  );
+}
+
+/** Botones de opción única (rango, tipo de código, método de pago). */
+export function Segmented<T extends string>({ label, value, options, onChange, full }: { label: string; value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; full?: boolean }) {
+  return (
+    <div className="seg" role="group" aria-label={label} style={full ? { display: "flex" } : undefined}>
+      {options.map(([v, l]) => (
+        <button type="button" key={v} aria-pressed={value === v} onClick={() => onChange(v)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Copia al portapapeles y lo anuncia ("Copiado") a lectores de pantalla. */
+export function CopyButton({ texto, etiqueta, className = "btn sm" }: { texto: string; etiqueta?: string; className?: string }) {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    if (!ok) return;
+    const t = setTimeout(() => setOk(false), 2000);
+    return () => clearTimeout(t);
+  }, [ok]);
+  return (
+    <>
+      <button
+        type="button"
+        className={className}
+        aria-label={etiqueta}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(texto);
+            setOk(true);
+          } catch {}
+        }}
+      >
+        <Icon name={ok ? "check" : "copy"} />
+        {ok ? "Copiado" : "Copiar"}
+      </button>
+      <span className="sr-only" role="status">{ok ? "Copiado al portapapeles" : ""}</span>
+    </>
+  );
+}
+
+export function EmptyState({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="empty">
+      <p>{children}</p>
+      {action}
     </div>
   );
 }
@@ -127,12 +297,12 @@ export function Preview({ data }: { data: any }) {
       {tablas.map(([k, rows]) => {
         const cols = Object.keys(rows[0]).filter((c) => c !== "id");
         return (
-          <div key={k}>
-            <h3 style={{ marginBottom: 6 }}>{label(k)}</h3>
-            <div className="preview">
+          <div key={k} className="stack tight">
+            <h3>{label(k)}</h3>
+            <div className="preview" tabIndex={0} role="region" aria-label={label(k)}>
               <table className="table">
                 <thead>
-                  <tr>{cols.map((c) => <th key={c}>{label(c)}</th>)}</tr>
+                  <tr>{cols.map((c) => <th key={c} scope="col">{label(c)}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.slice(0, 100).map((r, i) => (
@@ -228,7 +398,7 @@ export function ActionProvider({ children }: { children: ReactNode }) {
             </>
           }
         >
-          <p className="muted" style={{ margin: 0 }}>Revisa los cambios. Quedarán en el historial y se pueden deshacer.</p>
+          <p className="muted">Revisa los cambios. Quedarán en el historial y se pueden deshacer.</p>
           <Preview data={pending.res.vista_previa} />
         </Modal>
       )}
@@ -236,7 +406,7 @@ export function ActionProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Selector de producto con autocompletado ─────────────────────────
+// ── Selector de producto con autocompletado (combobox ARIA) ─────────
 export interface ProductoLite {
   id: number;
   nombre: string;
@@ -251,12 +421,13 @@ export interface ProductoLite {
   unidad: string;
 }
 
-export function ProductPicker({ onPick, placeholder, autoFocus }: { onPick: (p: ProductoLite) => void; placeholder?: string; autoFocus?: boolean }) {
+export function ProductPicker({ onPick, label, placeholder, autoFocus }: { onPick: (p: ProductoLite) => void; label: string; placeholder?: string; autoFocus?: boolean }) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ProductoLite[]>([]);
   const [hl, setHl] = useState(0);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
+  const listId = useId();
   useEffect(() => {
     if (!q.trim()) return setItems([]);
     const t = setTimeout(async () => {
@@ -272,11 +443,19 @@ export function ProductPicker({ onPick, placeholder, autoFocus }: { onPick: (p: 
     setItems([]);
     ref.current?.focus();
   };
+  const abierto = open && items.length > 0;
   return (
     <div className="picker">
       <input
         ref={ref}
         className="input"
+        role="combobox"
+        aria-label={label}
+        aria-expanded={abierto}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={abierto && items[hl] ? `${listId}-${items[hl].id}` : undefined}
+        autoComplete="off"
         value={q}
         autoFocus={autoFocus}
         placeholder={placeholder ?? "Buscar producto por nombre o código…"}
@@ -284,8 +463,9 @@ export function ProductPicker({ onPick, placeholder, autoFocus }: { onPick: (p: 
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={async (e) => {
-          if (e.key === "ArrowDown") (e.preventDefault(), setHl((h) => Math.min(h + 1, items.length - 1)));
+          if (e.key === "ArrowDown") (e.preventDefault(), setOpen(true), setHl((h) => Math.min(h + 1, items.length - 1)));
           if (e.key === "ArrowUp") (e.preventDefault(), setHl((h) => Math.max(h - 1, 0)));
+          if (e.key === "Escape" && abierto) (e.preventDefault(), e.stopPropagation(), setOpen(false));
           if (e.key === "Enter") {
             e.preventDefault();
             const exact = await get("buscar_productos", { codigo: q.trim(), limite: 1 }).catch(() => null);
@@ -294,43 +474,47 @@ export function ProductPicker({ onPick, placeholder, autoFocus }: { onPick: (p: 
           }
         }}
       />
-      {open && items.length > 0 && (
-        <div className="picker-list">
-          {items.map((p, i) => (
-            <div key={p.id} className={`picker-item ${i === hl ? "hl" : ""}`} onMouseDown={() => pick(p)}>
-              <span>
-                {p.nombre} <span className="muted small">{p.sku}</span>
-              </span>
-              <span className="muted num small">stock {qty(p.stock)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <ul id={listId} role="listbox" aria-label="Productos encontrados" className="picker-list" hidden={!abierto}>
+        {items.map((p, i) => (
+          <li key={p.id} id={`${listId}-${p.id}`} role="option" aria-selected={i === hl} className="picker-item" onMouseDown={(e) => (e.preventDefault(), pick(p))}>
+            <span>
+              {p.nombre} <span className="muted small">{p.sku}</span>
+            </span>
+            <span className="muted num small">stock {qty(p.stock)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
 export function StockBadge({ stock, minimo }: { stock: number; minimo: number }) {
-  const cls = stock <= 0 ? "bad" : stock <= minimo ? "warn" : "";
+  if (stock <= 0)
+    return (
+      <span className="badge bad">
+        <Icon name="ban" />
+        Agotado
+      </span>
+    );
+  const bajo = stock <= minimo;
   return (
-    <span className={`badge ${cls} num`} title={stock <= minimo ? `Mínimo: ${qty(minimo)}` : undefined}>
-      {stock <= 0 ? "Agotado" : qty(stock)}
-      {stock > 0 && stock <= minimo ? " · bajo" : ""}
+    <span className={`badge ${bajo ? "warn" : ""} num`}>
+      {bajo && <Icon name="alert" />}
+      {qty(stock)}
+      {bajo && <> · bajo<span className="sr-only"> (mínimo {qty(minimo)})</span></>}
     </span>
   );
 }
 
 export function Thumb({ foto, nombre }: { foto: string | null; nombre: string }) {
-  return foto ? <img className="thumb" src={foto} alt="" /> : <div className="thumb">{nombre.slice(0, 2).toUpperCase()}</div>;
+  return foto ? <img className="thumb" src={foto} alt="" /> : <div className="thumb" aria-hidden>{nombre.slice(0, 2).toUpperCase()}</div>;
 }
 
 export function ActorBadge({ tipo, cliente, usuario }: { tipo: string; cliente: string | null; usuario?: string | null }) {
   if (tipo === "ia") {
     return (
       <span className="badge ia">
-        <span style={{ width: 12, height: 12, display: "inline-flex" }}>
-          <Icon name="ia" />
-        </span>
+        <Icon name="ia" />
         IA · {cliente ?? "desconocida"}
       </span>
     );

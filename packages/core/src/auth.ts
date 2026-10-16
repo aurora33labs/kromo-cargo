@@ -68,6 +68,8 @@ export interface AuthOptions {
   /** URL pública del servidor, sin "/" final (p. ej. https://mi-tienda.up.railway.app). */
   urlPublica: string;
   nombreApp: string;
+  /** SVG inline del logo de la app para las páginas de autorización (opcional). */
+  logoSvg?: string;
   /** Verifica un PIN y regresa la identidad, o null. */
   verificarPin: (pin: string) => Promise<Identidad | null>;
   limitador?: Limitador;
@@ -75,6 +77,9 @@ export interface AuthOptions {
 
 export class Auth {
   readonly limitador: Limitador;
+  private get marca(): Marca {
+    return { app: this.o.nombreApp, logo: this.o.logoSvg };
+  }
   constructor(private o: AuthOptions) {
     this.limitador = o.limitador ?? new Limitador();
   }
@@ -233,23 +238,23 @@ export class Auth {
 
   private async autorizarGet(url: URL): Promise<Response> {
     const v = await this.validarSolicitud(url.searchParams);
-    if ("error" in v) return html(paginaError(this.o.nombreApp, v.error!), 400);
-    return html(paginaAutorizar(this.o.nombreApp, v.client.nombre, v.redirect, url.searchParams));
+    if ("error" in v) return html(paginaError(this.marca, v.error!), 400);
+    return html(paginaAutorizar(this.marca, v.client.nombre, v.redirect, url.searchParams));
   }
 
   private async autorizarPost(req: Request, ip: string): Promise<Response> {
     const form = new URLSearchParams(await req.text());
     const v = await this.validarSolicitud(form);
-    if ("error" in v) return html(paginaError(this.o.nombreApp, v.error!), 400);
+    if ("error" in v) return html(paginaError(this.marca, v.error!), 400);
     if (form.get("accion") === "cancelar") return redirigir(v.redirect, { error: "access_denied", state: form.get("state") });
     if (this.limitador.bloqueado(ip)) {
-      return html(paginaAutorizar(this.o.nombreApp, v.client.nombre, v.redirect, form, "Demasiados intentos. Espera unos minutos."), 429);
+      return html(paginaAutorizar(this.marca, v.client.nombre, v.redirect, form, "Demasiados intentos. Espera unos minutos."), 429);
     }
     const id = await this.o.verificarPin(form.get("pin") ?? "");
     if (!id || id.rol !== "dueno") {
       this.limitador.fallo(ip);
       await Bun.sleep(300);
-      return html(paginaAutorizar(this.o.nombreApp, v.client.nombre, v.redirect, form, id ? "Solo un dueño puede conectar una IA." : "PIN incorrecto."), 401);
+      return html(paginaAutorizar(this.marca, v.client.nombre, v.redirect, form, id ? "Solo un dueño puede conectar una IA." : "PIN incorrecto."), 401);
     }
     this.limitador.exito(ip);
     const codigo = aleatorio();
@@ -429,17 +434,27 @@ function html(body: string, status = 200): Response {
   });
 }
 
+// Mismos tokens que la UI de la app (tema Día / Noche, contraste WCAG AA) y tamaños en rem con base de 16 px.
 const ESTILO = `
-  :root{color-scheme:light dark;--bg:#f5f5f3;--s:#fcfcfb;--b:#e3e2de;--t:#0b0b0b;--t2:#52514e;--a:#2a78d6;--bad:#c62f2e}
-  @media (prefers-color-scheme:dark){:root{--bg:#121211;--s:#1a1a19;--b:#2e2e2b;--t:#fff;--t2:#c3c2b7;--a:#3987e5;--bad:#ef6b6a}}
-  *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
-  .c{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:28px;width:min(400px,100%);display:grid;gap:14px}
-  h1{font-size:20px;margin:0}p{margin:0;color:var(--t2)}b{color:var(--t)}
-  input{height:52px;font-size:22px;letter-spacing:.4em;text-align:center;border:1px solid var(--b);border-radius:10px;background:var(--bg);color:var(--t);width:100%}
-  .r{display:flex;gap:10px}button{flex:1;height:44px;border-radius:10px;border:1px solid var(--b);background:var(--s);color:var(--t);font:600 15px inherit;cursor:pointer}
-  button.p{background:var(--a);border-color:var(--a);color:#fff}.e{color:var(--bad);font-weight:600}ul{margin:0;padding-left:18px;color:var(--t2)}`;
+  :root{color-scheme:light dark;--bg:#f9fafc;--s:#fff;--b:#e1e5eb;--bi:#858c98;--t:#232933;--t2:#5d646f;--a:#6b5fca;--oa:#fff;--bad:#b52c3a}
+  @media (prefers-color-scheme:dark){:root{--bg:#0d1014;--s:#14181f;--b:#292e36;--bi:#69717e;--t:#dfe5ef;--t2:#979fab;--a:#9690f1;--oa:#0d1014;--bad:#ff7d87}}
+  *{box-sizing:border-box}html{font-size:100%}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--t);font:1rem/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:1rem}
+  .c{background:var(--s);border:1px solid var(--b);border-radius:.875rem;padding:1.75rem;width:min(26rem,100%);display:grid;gap:1rem}
+  .logo{width:3rem;height:3rem}.logo svg{display:block;width:100%;height:100%}h1{font-size:1.25rem;margin:0;line-height:1.3}p{margin:0;color:var(--t2)}b{color:var(--t)}
+  label{font-size:.875rem;font-weight:600}
+  input{min-height:3.25rem;font-size:1.5rem;letter-spacing:.4em;text-align:center;border:1px solid var(--bi);border-radius:.625rem;background:var(--s);color:var(--t);width:100%}
+  :focus-visible{outline:3px solid var(--a);outline-offset:2px}
+  .r{display:flex;gap:.625rem;flex-wrap:wrap}button{flex:1 1 8rem;min-height:2.75rem;border-radius:.625rem;border:1px solid var(--bi);background:var(--s);color:var(--t);font-family:inherit;font-size:1rem;font-weight:600;cursor:pointer}
+  button.p{background:var(--a);border-color:var(--a);color:var(--oa)}.e{color:var(--bad);font-weight:600}ul{margin:0;padding-left:1.25rem;color:var(--t2)}`;
 
-function paginaAutorizar(app: string, cliente: string, redirect: string, params: URLSearchParams, error?: string): string {
+interface Marca {
+  app: string;
+  logo?: string;
+}
+const logoHtml = (m: Marca) => (m.logo ? `<div class="logo" aria-hidden="true">${m.logo}</div>` : "");
+
+function paginaAutorizar(m: Marca, cliente: string, redirect: string, params: URLSearchParams, error?: string): string {
+  const app = m.app;
   // El nombre lo elige quien registra el cliente; el destino es lo que realmente recibe el acceso.
   const destino = new URL(redirect).hostname;
   const conocido = destinoConocido(destino);
@@ -448,19 +463,21 @@ function paginaAutorizar(app: string, cliente: string, redirect: string, params:
     .map((k) => `<input type="hidden" name="${k}" value="${esc(params.get(k)!)}">`)
     .join("");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conectar ${esc(cliente)}</title><style>${ESTILO}</style></head>
-<body><form class="c" method="post" action="/oauth/autorizar">${ocultos}
+<body><main class="c"><form method="post" action="/oauth/autorizar" style="display:grid;gap:1rem">${ocultos}
+${logoHtml(m)}
 <h1>Conectar ${esc(cliente)}</h1>
 <p><b>${esc(cliente)}</b> quiere operar <b>${esc(app)}</b> en tu nombre. El acceso se entregará a <b>${esc(destino)}</b>.</p>
 ${conocido ? "" : `<p class="e">${esc(destino)} no es Claude ni ChatGPT. Permite solo si tú iniciaste esta conexión desde esa aplicación.</p>`}
 <ul><li>Consultar productos, ventas y reportes</li><li>Registrar ventas, entradas y ajustes</li><li>Cambiar precios (siempre con vista previa)</li></ul>
 <p>Todo queda en el historial y puedes revocar el acceso cuando quieras.</p>
-${error ? `<p class="e">${esc(error)}</p>` : ""}
-<input name="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN de dueño" autofocus maxlength="12">
+${error ? `<p class="e" role="alert" id="pin-error">${esc(error)}</p>` : ""}
+<label for="pin">PIN de dueño</label>
+<input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" autofocus maxlength="12"${error ? ' aria-invalid="true" aria-describedby="pin-error"' : ""}>
 <div class="r"><button name="accion" value="cancelar" formnovalidate>Cancelar</button><button class="p" name="accion" value="permitir">Permitir</button></div>
-</form></body></html>`;
+</form></main></body></html>`;
 }
 
-function paginaError(app: string, mensaje: string): string {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(app)}</title><style>${ESTILO}</style></head>
-<body><div class="c"><h1>No se puede conectar</h1><p class="e">${esc(mensaje)}</p><p>Vuelve a intentarlo desde tu aplicación de IA.</p></div></body></html>`;
+function paginaError(m: Marca, mensaje: string): string {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(m.app)}</title><style>${ESTILO}</style></head>
+<body><main class="c">${logoHtml(m)}<h1>No se puede conectar</h1><p class="e">${esc(mensaje)}</p><p>Vuelve a intentarlo desde tu aplicación de IA.</p></main></body></html>`;
 }

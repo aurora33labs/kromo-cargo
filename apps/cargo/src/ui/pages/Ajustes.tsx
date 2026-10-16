@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useData } from "../api.ts";
-import { Icon, useAction } from "../components.tsx";
+import { CopyButton, Field, Icon, useAction } from "../components.tsx";
 import { useVersion } from "../version.ts";
 
 const PREGUNTAS = [
@@ -12,11 +12,11 @@ const PREGUNTAS = [
   "¿Qué productos llevan un mes sin venderse y cuánto dinero tengo ahí?",
 ];
 
-function Copiable({ texto }: { texto: string }) {
+function Copiable({ texto, etiqueta }: { texto: string; etiqueta: string }) {
   return (
-    <div className="row" style={{ flexWrap: "nowrap" }}>
-      <code className="block" style={{ flex: 1 }}>{texto}</code>
-      <button className="btn sm" onClick={() => navigator.clipboard?.writeText(texto)}>Copiar</button>
+    <div className="copy-row">
+      <code className="block">{texto}</code>
+      <CopyButton texto={texto} etiqueta={etiqueta} />
     </div>
   );
 }
@@ -32,25 +32,27 @@ function IaRemota({ urlMcp }: { urlMcp: string }) {
   return (
     <div className="card">
       <div className="card-head">
-        <span style={{ width: 18, height: 18, display: "inline-flex", color: "var(--ia)" }}><Icon name="ia" /></span>
+        <span className="ico"><Icon name="ia" /></span>
         <h2>Conectar una IA por internet</h2>
       </div>
-      <div className="card-pad stack" style={{ gap: 16 }}>
-        <div className="stack" style={{ gap: 6 }}>
+      <div className="card-pad stack">
+        <div className="stack tight">
           <h3>Dirección del MCP</h3>
-          <Copiable texto={urlMcp} />
+          <Copiable texto={urlMcp} etiqueta="Copiar dirección del MCP" />
         </div>
-        <div className="stack" style={{ gap: 6 }}>
+        <div className="stack tight">
           <h3>Claude (web, escritorio y celular) o ChatGPT</h3>
-          <ol className="steps" style={{ margin: 0, padding: 0 }}>
+          <ol className="steps">
             <li><b>Claude:</b> Configuración → Conectores → Agregar conector personalizado. <b>ChatGPT:</b> Configuración → Apps y conectores → Modo desarrollador → Crear.</li>
             <li>Pega la dirección del MCP. Al conectar se abre una página de esta tienda: entra con el PIN de un dueño y presiona Permitir.</li>
           </ol>
         </div>
-        <div className="stack" style={{ gap: 8 }}>
+        <div className="stack tight">
           <h3>Claude Code, Gemini CLI u otro agente (con token)</h3>
-          <div className="row" style={{ flexWrap: "nowrap" }}>
-            <input className="input" placeholder="Nombre del token, p. ej. Claude Code de Lupe" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <div className="row" style={{ alignItems: "flex-end" }}>
+            <Field label="Nombre del token" help="Por ejemplo: Claude Code de Lupe" className="grow">
+              <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            </Field>
             <button
               className="btn primary"
               disabled={!nombre.trim()}
@@ -62,23 +64,23 @@ function IaRemota({ urlMcp }: { urlMcp: string }) {
               Crear token
             </button>
           </div>
-          {nuevo && <div className="badge warn" style={{ justifySelf: "start" }}>Copia el token: no se vuelve a mostrar.</div>}
+          {nuevo && <div className="badge warn" role="alert" style={{ justifySelf: "start" }}><Icon name="alert" /> Copia el token: no se vuelve a mostrar.</div>}
           <span className="small muted">Claude Code:</span>
-          <Copiable texto={`claude mcp add --transport http kromo-cargo ${urlMcp} --header "Authorization: Bearer ${tk}"`} />
+          <Copiable etiqueta="Copiar comando para Claude Code" texto={`claude mcp add --transport http kromo-cargo ${urlMcp} --header "Authorization: Bearer ${tk}"`} />
           <span className="small muted">Gemini CLI (~/.gemini/settings.json):</span>
-          <Copiable texto={JSON.stringify({ mcpServers: { "kromo-cargo": { httpUrl: urlMcp, headers: { Authorization: `Bearer ${tk}` } } } })} />
+          <Copiable etiqueta="Copiar configuración para Gemini CLI" texto={JSON.stringify({ mcpServers: { "kromo-cargo": { httpUrl: urlMcp, headers: { Authorization: `Bearer ${tk}` } } } })} />
         </div>
-        <div>
-          <h3 style={{ marginBottom: 6 }}>Accesos activos</h3>
-          <table className="table">
+        <div className="stack tight">
+          <h3 id="accesos-titulo">Accesos activos</h3>
+          <table className="table" aria-labelledby="accesos-titulo">
             <tbody>
               {accesos.data?.map((a) => (
                 <tr key={a.id}>
                   <td><span className={`badge ${a.tipo === "oauth" ? "ia" : ""}`}>{a.tipo === "oauth" ? "Conector" : "Token"}</span></td>
-                  <td style={{ fontWeight: 600 }}>{a.nombre}</td>
+                  <td className="strong">{a.nombre}</td>
                   <td className="small muted">{a.ultimo_uso ? `usado ${a.ultimo_uso.slice(0, 16)}` : "sin usar"}</td>
                   <td className="r">
-                    <button className="btn sm danger" onClick={() => run("revocar_acceso", { id: a.id }, { exito: () => "Acceso revocado" })}>Revocar</button>
+                    <button className="btn sm danger" onClick={() => run("revocar_acceso", { id: a.id }, { exito: () => "Acceso revocado" })} aria-label={`Revocar ${a.nombre}`}>Revocar</button>
                   </td>
                 </tr>
               ))}
@@ -108,45 +110,45 @@ export function Ajustes() {
       <div className="cols">
         <div className="stack">
           {servidor && cfg.data?.url_mcp && <IaRemota urlMcp={cfg.data.url_mcp} />}
-          <div className="card" style={servidor ? { display: "none" } : undefined}>
+          <div className="card" hidden={servidor}>
             <div className="card-head">
-              <span style={{ width: 18, height: 18, display: "inline-flex", color: "var(--ia)" }}><Icon name="ia" /></span>
+              <span className="ico"><Icon name="ia" /></span>
               <h2>Tu IA ya puede operar este inventario</h2>
             </div>
-            <div className="card-pad stack" style={{ gap: 14 }}>
-              <ol className="steps" style={{ margin: 0, padding: 0 }}>
+            <div className="card-pad stack">
+              <ol className="steps">
                 <li>
                   Si instalaste con el prompt, ya está conectado. Si no, en una terminal corre:
-                  <code className="block" style={{ marginTop: 6 }}>kromo-cargo conectar</code>
+                  <code className="block" style={{ marginTop: "0.375rem" }}>kromo-cargo conectar</code>
                   <span className="small muted">Lo registra en Claude Code, Codex CLI, Gemini CLI y Claude Desktop (los que tengas).</span>
                 </li>
                 <li>Abre tu IA y pregúntale lo que necesites. Todo lo que haga aparece aquí en vivo y queda en el Historial.</li>
                 <li>Los cambios grandes (precios en lote, importaciones, ajustes fuertes) siempre te piden confirmación primero.</li>
               </ol>
-              <div>
-                <h3 style={{ marginBottom: 8 }}>Prueba pedirle</h3>
-                <div className="stack" style={{ gap: 6 }}>
+              <div className="stack tight">
+                <h3>Prueba pedirle</h3>
+                <ul className="stack tight" style={{ margin: 0, padding: 0, listStyle: "none" }}>
                   {PREGUNTAS.map((p) => (
-                    <div key={p} className="row" style={{ flexWrap: "nowrap", background: "var(--surface-2)", borderRadius: 8, padding: "8px 10px" }}>
-                      <span style={{ flex: 1 }}>“{p}”</span>
-                      <button className="btn ghost sm" onClick={() => navigator.clipboard?.writeText(p)}>Copiar</button>
-                    </div>
+                    <li key={p} className="prompt-row">
+                      <span>“{p}”</span>
+                      <CopyButton texto={p} etiqueta={`Copiar: ${p}`} className="btn ghost sm" />
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             </div>
           </div>
 
           <div className="card">
             <div className="card-head"><h2>Usuarios</h2></div>
-            <table className="table">
+            <table className="table" aria-label="Usuarios">
               <tbody>
                 {usuarios.data?.map((u) => (
                   <tr key={u.id}>
-                    <td style={{ fontWeight: 600 }}>{u.nombre}</td>
+                    <td className="strong">{u.nombre}{!u.activo && <span className="badge" style={{ marginLeft: "0.5rem" }}>Inactivo</span>}</td>
                     <td><span className={`badge ${u.rol === "dueno" ? "accent" : ""}`}>{u.rol === "dueno" ? "Dueño" : "Empleado"}</span></td>
                     <td className="r">
-                      <button className="btn sm" onClick={() => run("guardar_usuario", { id: u.id, nombre: u.nombre, rol: u.rol, activo: !u.activo }, { exito: () => "Usuario actualizado" })}>
+                      <button className="btn sm" onClick={() => run("guardar_usuario", { id: u.id, nombre: u.nombre, rol: u.rol, activo: !u.activo }, { exito: () => "Usuario actualizado" })} aria-label={`${u.activo ? "Desactivar" : "Activar"} a ${u.nombre}`}>
                         {u.activo ? "Desactivar" : "Activar"}
                       </button>
                     </td>
@@ -154,24 +156,22 @@ export function Ajustes() {
                 ))}
               </tbody>
             </table>
-            <div className="card-pad row" style={{ borderTop: "1px solid var(--border)", alignItems: "flex-end" }}>
-              <label className="field" style={{ flex: 2, minWidth: 140 }}>
-                <span>Nombre</span>
+            <div className="card-pad row" style={{ borderTop: "1px solid var(--border)", alignItems: "flex-start" }} role="group" aria-label="Agregar usuario">
+              <Field label="Nombre" style={{ flex: "2 1 9rem" }}>
                 <input className="input" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
-              </label>
-              <label className="field" style={{ flex: 1, minWidth: 120 }}>
-                <span>Rol</span>
+              </Field>
+              <Field label="Rol" style={{ flex: "1 1 8rem" }}>
                 <select className="select" value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value })}>
                   <option value="empleado">Empleado</option>
                   <option value="dueno">Dueño</option>
                 </select>
-              </label>
-              <label className="field" style={{ flex: 1, minWidth: 100 }}>
-                <span>PIN</span>
-                <input className="input" inputMode="numeric" maxLength={12} placeholder={`${cfg.data?.pin_minimo ?? 4}+ dígitos`} value={nuevo.pin} onChange={(e) => setNuevo({ ...nuevo, pin: e.target.value.replace(/\D/g, "") })} />
-              </label>
+              </Field>
+              <Field label="PIN" help={`${cfg.data?.pin_minimo ?? 4} a 12 dígitos`} style={{ flex: "1 1 8rem" }}>
+                <input className="input" inputMode="numeric" autoComplete="new-password" maxLength={12} value={nuevo.pin} onChange={(e) => setNuevo({ ...nuevo, pin: e.target.value.replace(/\D/g, "") })} />
+              </Field>
               <button
                 className="btn primary"
+                style={{ marginTop: "1.6rem" }}
                 disabled={!nuevo.nombre || nuevo.pin.length < (cfg.data?.pin_minimo ?? 4)}
                 onClick={async () => (await run("guardar_usuario", nuevo, { exito: () => "Usuario creado" })) && setNuevo({ nombre: "", rol: "empleado", pin: "" })}
               >
@@ -185,12 +185,11 @@ export function Ajustes() {
         </div>
 
         <div className="stack">
-          <div className="card card-pad stack" style={{ gap: 12 }}>
+          <div className="card card-pad stack">
             <h2>Negocio</h2>
-            <label className="field">
-              <span>Nombre</span>
+            <Field label="Nombre del negocio">
               <input className="input" value={nombre ?? cfg.data?.nombre_negocio ?? ""} onChange={(e) => setNombre(e.target.value)} />
-            </label>
+            </Field>
             <button
               className="btn"
               disabled={nombre === null || !nombre.trim()}
@@ -198,7 +197,7 @@ export function Ajustes() {
             >
               Guardar nombre
             </button>
-            <label className="check" style={servidor ? { display: "none" } : undefined}>
+            <label className="check" hidden={servidor}>
               <input
                 type="checkbox"
                 checked={!!cfg.data?.requerir_pin}
@@ -207,13 +206,13 @@ export function Ajustes() {
               Pedir PIN al abrir la app
             </label>
           </div>
-          <div className="card card-pad stack" style={{ gap: 8 }}>
+          <div className="card card-pad stack tight">
             <h2>Tus datos</h2>
-            <p className="muted small" style={{ margin: 0 }}>
+            <p className="muted small">
               {servidor ? `En el servidor · ${cfg.data?.base_de_datos}.` : "Todo vive en tu computadora, en un solo archivo. Nadie más lo ve."}
             </p>
             <code className="block">{cfg.data?.carpeta_datos}</code>
-            <p className="muted small" style={{ margin: 0 }}>
+            <p className="muted small">
               Respaldo: <span className="mono">kromo-cargo respaldo</span> · Diagnóstico: <span className="mono">kromo-cargo doctor</span>
             </p>
           </div>
