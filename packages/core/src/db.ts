@@ -264,15 +264,20 @@ export async function openDatabase(url: string, sets: MigrationSet[], opts: Open
   }
 
   await db.exec("CREATE TABLE IF NOT EXISTS migraciones (modulo TEXT PRIMARY KEY, version INTEGER NOT NULL)");
-  await db.transaction(async (tx) => {
+  const pendientes = async (q: Pick<Db, "get">) => {
     const pending = [];
     for (const set of [CORE_MIGRATIONS, ...sets]) {
-      const row = await tx.get<{ version: number }>("SELECT version FROM migraciones WHERE modulo = ?", [set.modulo]);
+      const row = await q.get<{ version: number }>("SELECT version FROM migraciones WHERE modulo = ?", [set.modulo]);
       const current = Number(row?.version ?? 0);
       pending.push(...set.migraciones.filter((m) => m.version > current).sort((a, b) => a.version - b.version).map((m) => ({ modulo: set.modulo, ...m })));
     }
+    return pending;
+  };
+  // El respaldo va antes de la transacción: SQLite no permite VACUUM INTO dentro de una.
+  if (existed && opts.backupDir && db instanceof SqliteDb && (await pendientes(db)).length) backupSqlite(db, opts.backupDir, "antes-de-migrar");
+  await db.transaction(async (tx) => {
+    const pending = await pendientes(tx);
     if (!pending.length) return;
-    if (existed && opts.backupDir && db instanceof SqliteDb) backupSqlite(db, opts.backupDir, "antes-de-migrar");
     for (const m of pending) {
       await tx.exec(dialectSql(m.sql, db.dialect));
       await tx.run(

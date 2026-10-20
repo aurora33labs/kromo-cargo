@@ -371,3 +371,27 @@ describe("limitador de intentos", () => {
     expect(l.bloqueado("10.0.0.1")).toBe(true);
   });
 });
+
+describe("migrar una base existente (SQLite en archivo)", () => {
+  test("respalda antes de migrar y migra: una base de la v1 abre con la versión actual", async () => {
+    const { openDatabase } = await import("@kromo/core");
+    const { migraciones } = await import("../src/schema.ts");
+    const { mkdtempSync, readdirSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "kc-migrar-"));
+    try {
+      const archivo = join(dir, "cargo.db");
+      // Base como la de un despliegue anterior: solo la primera migración de la app.
+      const vieja = await openDatabase(archivo, [{ ...migraciones, migraciones: migraciones.migraciones.filter((m) => m.version === 1) }]);
+      await vieja.run("INSERT INTO usuarios (nombre, rol, pin_hash, creado_en) VALUES ('Dueño', 'dueno', 'x', '2026-01-01 00:00:00')");
+      await vieja.close();
+      const db = await openDatabase(archivo, [migraciones], { backupDir: join(dir, "respaldos") });
+      expect(await db.get("SELECT nombre, usuario, password_hash FROM usuarios")).toEqual({ nombre: "Dueño", usuario: null, password_hash: null });
+      expect(readdirSync(join(dir, "respaldos")).some((f) => f.includes("antes-de-migrar"))).toBe(true);
+      await db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
