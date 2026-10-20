@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { generarEtiquetas } from "./actions/etiquetas.ts";
 import { exportarProductos, importarProductos } from "./actions/importacion.ts";
 import { ajustarStock, registrarEntrada, registrarVenta } from "./actions/movimientos.ts";
-import { configurarNegocio, guardarUsuario, listarUsuarios, verConfiguracion } from "./actions/negocio.ts";
+import { exportarHistorial, exportarVentas } from "./actions/exportaciones.ts";
+import { configurarDominio, configurarNegocio, crearRespaldo, guardarUsuario, listarUsuarios, verConfiguracion } from "./actions/negocio.ts";
 import {
   actualizarPreciosMasivo,
   actualizarProducto,
@@ -50,10 +51,14 @@ export async function createApp(dataDir: string, dbUrl = process.env.DATABASE_UR
     generarEtiquetas,
     importarProductos,
     exportarProductos,
+    exportarVentas,
+    exportarHistorial,
     verConfiguracion,
     configurarNegocio,
     listarUsuarios,
     guardarUsuario,
+    configurarDominio,
+    crearRespaldo,
     ...accionesDeAccesos,
   );
   return { db, registry, dataDir };

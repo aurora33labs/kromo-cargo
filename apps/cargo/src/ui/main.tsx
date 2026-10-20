@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { login, logout, sesionInfo, ultimoCambio } from "./api.ts";
+import { AccesoPin, DefinirCuenta, Login, Registro } from "./acceso.tsx";
+import { logout, sesionInfo, ultimoCambio, type SesionInfo } from "./api.ts";
+import { AvisoNube, KOFI_URL, mostrarApoyo } from "./promo.tsx";
 import { ActionProvider, Icon, Logo, ToastProvider, iniciales, useToast } from "./components.tsx";
 import { Ajustes } from "./pages/Ajustes.tsx";
 import { Entradas } from "./pages/Entradas.tsx";
@@ -70,7 +72,7 @@ function SelectorTema() {
   );
 }
 
-function TarjetaUsuario({ usuario, onLogout }: { usuario: { nombre: string; rol: string }; onLogout?: () => void }) {
+function TarjetaUsuario({ usuario, onLogout, onCajero }: { usuario: { nombre: string; rol: string }; onLogout?: () => void; onCajero?: () => void }) {
   const rol = usuario.rol === "dueno" ? "Dueño" : "Empleado";
   return (
     <div className="user-card">
@@ -80,6 +82,11 @@ function TarjetaUsuario({ usuario, onLogout }: { usuario: { nombre: string; rol:
         {/* En modo local el usuario por defecto se llama "Dueño": no repetimos el rol. */}
         {usuario.nombre.toLowerCase() !== rol.toLowerCase() && <span className="user-role">{rol}</span>}
       </span>
+      {onCajero && (
+        <button type="button" className="btn ghost icon" onClick={onCajero} aria-label="Cambiar de cajero" title="Cambiar de cajero (con PIN)">
+          <Icon name="lock" />
+        </button>
+      )}
       {onLogout && (
         <button type="button" className="btn ghost icon" onClick={onLogout} aria-label="Cerrar sesión" title="Cerrar sesión">
           <Icon name="logout" />
@@ -100,7 +107,23 @@ function EstadoEnVivo({ enLinea }: { enLinea: boolean }) {
 
 const PRINCIPALES = ["venta", "productos", "entradas", "reportes"];
 
-function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nombre: string; rol: string } | null; onLogout?: () => void }) {
+function Apoyo() {
+  return (
+    <a className="apoyo" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
+      <Icon name="heart" />
+      Apoyar a Kromo<span className="sr-only"> en Ko-fi (se abre en otra pestaña)</span>
+    </a>
+  );
+}
+
+interface ShellProps {
+  info: SesionInfo;
+  onLogout?: () => void;
+  onCajero?: () => void;
+}
+
+function Shell({ info, onLogout, onCajero }: ShellProps) {
+  const { negocio, usuario, despliegue } = info;
   const page = usePage();
   const toast = useToast();
   const [version, setVersion] = useState(0);
@@ -180,14 +203,16 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
             </ul>
           </nav>
           <div className="sidebar-foot">
-            {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} />}
+            {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} onCajero={onCajero} />}
             <div className="foot-row">
               <EstadoEnVivo enLinea={enLinea} />
               <SelectorTema />
             </div>
+            {mostrarApoyo(despliegue) && <Apoyo />}
           </div>
         </aside>
         <main className="main" id="contenido" ref={main} tabIndex={-1}>
+          {page !== "venta" && <AvisoNube despliegue={despliegue} />}
           <Current key={page} />
         </main>
         <nav className="bottom-nav" aria-label="Secciones">
@@ -205,11 +230,12 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
             <ul className="more-menu nav" id="menu-mas">
               {PAGES.filter((p) => !PRINCIPALES.includes(p.id)).map((p) => <li key={p.id}>{enlace(p)}</li>)}
               <li className="more-foot">
-                {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} />}
+                {usuario && <TarjetaUsuario usuario={usuario} onLogout={onLogout} onCajero={onCajero} />}
                 <div className="foot-row">
                   <EstadoEnVivo enLinea={enLinea} />
                   <SelectorTema />
                 </div>
+                {mostrarApoyo(despliegue) && <Apoyo />}
               </li>
             </ul>
           )}
@@ -219,58 +245,10 @@ function Shell({ negocio, usuario, onLogout }: { negocio: string; usuario: { nom
   );
 }
 
-function Login({ negocio, onOk }: { negocio: string; onOk: () => void }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  useEffect(() => {
-    document.title = `Entrar · ${negocio} · Kromo Cargo`;
-  }, [negocio]);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEnviando(true);
-    const r = await login(pin);
-    setEnviando(false);
-    if (r.ok) {
-      onOk();
-    } else {
-      setError(r.error ?? "PIN incorrecto");
-      setPin("");
-    }
-  };
-  return (
-    <main className="login">
-      <form className="card" onSubmit={submit} aria-labelledby="login-titulo">
-        <Logo className="brand-logo" />
-        <div>
-          <h1 id="login-titulo">{negocio}</h1>
-          <p className="muted">Kromo Cargo</p>
-        </div>
-        <div className="field">
-          <label htmlFor="pin" className="field-label">Tu PIN</label>
-          <input
-            id="pin"
-            className="input pin"
-            type="password"
-            inputMode="numeric"
-            autoComplete="current-password"
-            autoFocus
-            value={pin}
-            onChange={(e) => (setPin(e.target.value.replace(/\D/g, "")), setError(""))}
-            maxLength={12}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "pin-error" : undefined}
-          />
-        </div>
-        <div role="alert" id="pin-error" className="field-error">{error}</div>
-        <button className="btn primary lg" disabled={pin.length < 4 || enviando}>{enviando ? "Entrando…" : "Entrar"}</button>
-      </form>
-    </main>
-  );
-}
-
 function App() {
-  const [info, setInfo] = useState<Awaited<ReturnType<typeof sesionInfo>> | null>(null);
+  const [info, setInfo] = useState<SesionInfo | null>(null);
+  // En un equipo de la tienda se entra con PIN; "con contraseña" cambia a usuario y contraseña.
+  const [conContrasena, setConContrasena] = useState(false);
   const refresh = () => sesionInfo().then(setInfo).catch(() => setInfo(null));
   useEffect(() => {
     refresh();
@@ -279,11 +257,21 @@ function App() {
     return () => window.removeEventListener("sesion-expirada", on);
   }, []);
   if (!info) return <div className="login muted" role="status">Cargando…</div>;
-  if (info.requiere_pin && !info.usuario) return <Login negocio={info.negocio} onOk={refresh} />;
+  const entrar = () => (setConContrasena(false), refresh());
+  if (info.registro) return <Registro negocioInicial={info.negocio} onOk={entrar} />;
+  if (info.requiere_pin && !info.usuario) {
+    if (info.equipo && !conContrasena) return <AccesoPin negocio={info.negocio} onContrasena={() => setConContrasena(true)} onOk={entrar} />;
+    return <Login negocio={info.negocio} conPin={info.equipo} onPin={() => setConContrasena(false)} onOk={entrar} />;
+  }
+  if (info.usuario?.pendiente) return <DefinirCuenta nombre={info.usuario.nombre} onOk={entrar} />;
   return (
     <ToastProvider>
       <ActionProvider>
-        <Shell negocio={info.negocio} usuario={info.usuario} onLogout={info.requiere_pin ? () => logout().then(refresh) : undefined} />
+        <Shell
+          info={info}
+          onLogout={info.requiere_pin ? () => logout(true).then(refresh) : undefined}
+          onCajero={info.requiere_pin && info.equipo ? () => logout(false).then(refresh) : undefined}
+        />
       </ActionProvider>
     </ToastProvider>
   );

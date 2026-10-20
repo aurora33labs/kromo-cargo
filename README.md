@@ -16,17 +16,41 @@ El mismo código corre en los dos motores:
 
 - La capa está en `packages/core/src/db.ts`: interfaz `Db` asíncrona, placeholders `?` en ambos motores y transacciones exclusivas (`BEGIN IMMEDIATE` en SQLite, *advisory lock* en Postgres) para que la app y el MCP no se pisen.
 - Las fechas se guardan como texto local `AAAA-MM-DD HH:MM:SS` generado en JS. **En un servidor hay que definir `TZ=America/Mexico_City`** (o la zona del negocio); si no, "ventas de hoy" se calcula en UTC.
-- Respaldos: `kromo-cargo respaldo` en SQLite; con Postgres, `pg_dump` o los respaldos de Railway.
+- Respaldos: el dueño los descarga en *Ajustes → Negocio* (SQLite: `.db`; Postgres: JSON) o con `kromo-cargo respaldo`. Se restauran con `kromo-cargo restaurar <archivo.db>`.
 
-## Modo servidor (Railway)
+## Tres formas de usarla
 
-La misma app corre como servicio web cuando existe `KROMO_URL_PUBLICA` o `RAILWAY_PUBLIC_DOMAIN`:
+| Dónde | Cómo | Datos |
+|---|---|---|
+| **Railway** | Template en un toque (ver [RAILWAY.md](RAILWAY.md)) | Volume o Postgres en Railway |
+| **Docker en tu computadora** | `docker compose up -d` → http://localhost:8090 | Volumen `kromo-datos` |
+| **Ejecutable local** | Instalación por prompt (`site/install/cargo.md`) | Carpeta de datos del sistema |
 
-- Escucha en `0.0.0.0:$PORT`, acepta solo su dominio (y `/salud` para el healthcheck).
-- **PIN obligatorio** (6+ dígitos). El primer dueño se crea con `KROMO_PIN_INICIAL`; sin esa variable no arranca.
+En Railway y en Docker, la primera persona que abre la app crea la cuenta del dueño ("Crea tu cuenta"); no hay variables obligatorias. La app detecta dónde corre (`RAILWAY_*`, `/.dockerenv`, o `KROMO_DESPLIEGUE`). Con eso adapta las instrucciones de *Ajustes → Conectar IA* y muestra, solo en local y en Docker, un aviso discreto para ofrecer la versión en la nube (tarjeta en *Ajustes → Negocio* y un aviso como máximo una vez por semana). `KROMO_DESPLIEGUE=gestionado` oculta la promoción y el enlace de apoyo (Ko-fi).
+
+### Docker en tu computadora
+
+```sh
+git clone https://github.com/aurora33labs/kromo-cargo && cd kromo-cargo
+docker compose up -d            # abre http://localhost:8090 y crea tu cuenta
+```
+
+- **Claude de escritorio y Claude Code** se conectan con `docker exec -i kromo-cargo kromo-cargo mcp`, sin tokens. En *Ajustes → Conectar IA* está la configuración lista para copiar.
+- **Otros agentes** usan `http://localhost:8090/mcp` con un token.
+- `KROMO_PUERTO=9000 docker compose up -d` cambia el puerto.
+- Actualizar: `git pull && docker compose up -d --build`.
+- Olvidaste la contraseña: `docker exec -it kromo-cargo kromo-cargo contrasena <usuario>`.
+
+## Modo servidor (Railway y Docker)
+
+La misma app corre como servicio web cuando existe `KROMO_URL_PUBLICA`, `RAILWAY_PUBLIC_DOMAIN` o `KROMO_MODO=servidor` (la imagen Docker lo trae):
+
+- Escucha en `0.0.0.0:$PORT` y acepta solo su dominio (y `/salud` para el healthcheck).
+- **Inicio de sesión obligatorio con usuario y contraseña.** El primer dueño se registra desde la UI. En un equipo donde ya se entró con contraseña, se cambia de cajero con un **PIN de caja** (único por persona).
+- **Dominio propio desde la UI** (*Ajustes → Dominio*): se acepta al instante y pasa a ser la URL pública, sin variables.
 - Sesiones en cookie HttpOnly guardadas en la base (sobreviven reinicios) y bloqueo de fuerza bruta por IP y global.
 - **MCP remoto en `/mcp`** (Streamable HTTP, sin estado):
-  - **OAuth 2.1** con PKCE y registro dinámico, para los conectores de claude.ai y ChatGPT. La autorización se da con el PIN de un dueño.
+  - **OAuth 2.1** con PKCE y registro dinámico, para los conectores de claude.ai y ChatGPT. La autorización se da con el usuario y la contraseña de un dueño.
   - **Tokens de acceso** para Claude Code, Gemini CLI y otros agentes.
   - Todo se administra y desconecta en *Ajustes → Conectar IA*.
 - Una IA remota no puede leer archivos del servidor: solo usa lo subido a la app o manda el contenido (CSV) directamente. Los PDF y Excel generados se entregan con enlaces firmados que caducan en 1 hora.
@@ -37,8 +61,8 @@ Despliegue, variables y template: **[RAILWAY.md](RAILWAY.md)**. La imagen está 
 
 ```sh
 bun install
-bun test                         # 107 pruebas con SQLite: acciones, MCP, API, concurrencia, modo servidor, OAuth y contraste de la UI
-bun run db:up                    # Postgres local en Docker (puerto 55440)
+bun test                         # 128 pruebas con SQLite: acciones, MCP, API, concurrencia, modo servidor, registro, OAuth y contraste de la UI
+bun run db:up                    # Postgres local en Docker (puerto 55440, docker-compose.pg.yml)
 bun run test:pg                  # las mismas pruebas contra Postgres (una base nueva por prueba)
 bun run typecheck
 cd apps/cargo
@@ -55,7 +79,7 @@ Prueba end-to-end con navegador real + cliente MCP (requiere Chromium de Playwri
 ```sh
 bun test/e2e/flujo.ts            # CHROME_PATH=… si usas otro Chromium; SHOTS=carpeta para capturas
 DATABASE_URL=postgres://…/base_vacia bun test/e2e/flujo.ts   # lo mismo sobre Postgres
-bun test/e2e/remoto.ts https://<dominio> <PIN>               # verifica un despliegue en modo servidor
+bun test/e2e/remoto.ts https://<dominio> <usuario> <contraseña>   # verifica un despliegue (hace el registro si está recién instalado)
 bun test/e2e/a11y.ts             # auditoría WCAG 2.2 AA: axe en todas las pantallas (Día y Noche), teclado, reflow a 320 px y texto al 200 %
 ```
 
@@ -66,12 +90,7 @@ La UI cumple WCAG 2.2 AA y `test/e2e/a11y.ts` lo verifica en cada cambio.
 - **Colores:** los tokens de los temas Día y Noche están en el mismo archivo, y `test/contraste.test.ts` comprueba que cada par texto/fondo cumpla el contraste mínimo.
 - **Logo:** está en `src/ui/assets/`: `logo.svg`, `favicon.svg` y los PNG para iOS y la app instalable.
 
-Contenedor local como en Railway:
-
-```sh
-docker build -t kromo-cargo .
-docker run -p 8090:8080 -v inv:/data -e KROMO_URL_PUBLICA=http://localhost:8090 -e KROMO_PIN_INICIAL=135791 kromo-cargo
-```
+Contenedor local como en Railway: `docker compose up -d --build` (ver arriba).
 
 ## Estructura
 
@@ -88,8 +107,8 @@ apps/cargo/src/
   actions/      productos, movimientos (entradas/ventas/ajustes), reportes, etiquetas, importación, negocio
   ui/           React (Bun la empaqueta y la embebe en el ejecutable)
   skill/        SKILL.md que se instala para Claude Code / Codex
-  cli.ts        serve · mcp · conectar · desconectar · doctor · demo · respaldo · pin · actualizar
-  config.ts     modo local / servidor (variables de entorno)
+  cli.ts        serve · mcp · conectar · desconectar · doctor · demo · respaldo · restaurar · contrasena · pin · salud · actualizar
+  config.ts     modo local / servidor, tipo de despliegue (railway · docker · local · gestionado) y dominio propio
   server.ts     UI, API, sesiones, OAuth, MCP remoto y archivos firmados
   conectar.ts   registro del MCP en los 4 clientes (con respaldo de cada config)
 site/           landing con "Copiar prompt" + recetas y scripts de instalación
@@ -122,7 +141,9 @@ SQL portable (lo validan las pruebas en ambos motores): `CAST(COUNT(*) AS INTEGE
 - El ejecutable pesa entre 70 y 95 MB, porque incluye el runtime de Bun.
 - Sin firma de desarrollador de Apple ni de Windows. La descarga por `curl`/PowerShell no activa Gatekeeper ni SmartScreen, pero conviene firmar y notarizar antes de distribuir a gran escala.
 - Desde una IA remota no se pueden dar de alta fotos (no tiene acceso a archivos del servidor); se suben desde la UI.
-- El template de Railway se publica desde el panel de Railway (pasos en RAILWAY.md); aún no está creado.
+- El template de Railway se publica desde el panel de Railway (pasos en RAILWAY.md); aún no está creado, y el botón "Deploy on Railway" espera su URL.
+- El primer registro no pide código: quien abra primero una instalación nueva se vuelve dueño. Crea tu cuenta en cuanto termine el despliegue.
+- Sin lista de ventas, devoluciones parciales, corte de caja, clientes/fiado, proveedores, IVA/CFDI ni tickets impresos.
 - Los conectores de claude.ai y ChatGPT se probaron con el flujo OAuth completo de forma automatizada, pero no contra esos clientes reales: requieren una URL pública.
 
 ## Seguridad

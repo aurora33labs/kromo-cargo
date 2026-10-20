@@ -41,18 +41,44 @@ export async function upload(file: File): Promise<{ ok: boolean; ruta?: string; 
   return handle(res);
 }
 
+export type Despliegue = "railway" | "docker" | "local" | "gestionado";
+export interface SesionInfo {
+  negocio: string;
+  /** La app pide iniciar sesión (siempre en servidor; opcional en local). */
+  requiere_pin: boolean;
+  modo: "local" | "servidor";
+  despliegue: Despliegue;
+  /** Sin usuarios todavía: toca el primer registro ("Crea tu cuenta"). */
+  registro: boolean;
+  /** Este navegador ya es equipo de la tienda: se puede entrar con PIN de caja. */
+  equipo: boolean;
+  version: string;
+  usuario: { nombre: string; rol: string; pendiente: boolean } | null;
+}
+
 export async function sesionInfo() {
   const res = await fetch("/api/sesion", { headers: headers(false) });
-  return res.json() as Promise<{ negocio: string; requiere_pin: boolean; modo: "local" | "servidor"; usuario: { nombre: string; rol: string } | null }>;
+  return res.json() as Promise<SesionInfo>;
 }
 
-export async function login(pin: string) {
-  const res = await fetch("/api/sesion", { method: "POST", headers: headers(), body: JSON.stringify({ pin }) });
-  return res.json() as Promise<{ ok: boolean; error?: string }>;
-}
+type Respuesta = { ok: boolean; error?: string };
+const enviar = async (ruta: string, body: unknown): Promise<Respuesta> => {
+  try {
+    const res = await fetch(ruta, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    return (await res.json()) as Respuesta;
+  } catch {
+    return { ok: false, error: "No hay conexión con la app." };
+  }
+};
 
-export async function logout() {
-  await fetch("/api/sesion", { method: "DELETE", headers: headers(false) });
+export const login = (usuario: string, contrasena: string) => enviar("/api/sesion", { usuario, contrasena });
+export const loginPin = (pin: string) => enviar("/api/sesion/pin", { pin });
+export const registrar = (datos: { negocio: string; nombre: string; usuario: string; contrasena: string; pin: string }) => enviar("/api/registro", datos);
+export const definirCuenta = (usuario: string, contrasena: string) => enviar("/api/cuenta", { usuario, contrasena });
+
+/** Cierra la sesión. `olvidar` también desvincula este equipo (ya no se podrá entrar con PIN). */
+export async function logout(olvidar = false) {
+  await fetch(`/api/sesion${olvidar ? "?olvidar=1" : ""}`, { method: "DELETE", headers: headers(false) });
 }
 
 export async function ultimoCambio() {

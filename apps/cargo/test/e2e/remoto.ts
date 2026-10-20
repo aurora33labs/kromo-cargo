@@ -1,9 +1,10 @@
 // Verifica un despliegue en modo servidor (contenedor local o Railway).
-// Uso: bun test/e2e/remoto.ts <url> <pin-de-dueño>
+// Uso: bun test/e2e/remoto.ts <url> <usuario> <contraseña>
+// Si la app está recién desplegada (sin usuarios), primero hace el registro con esos datos.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const [base = "http://localhost:8090", pin = ""] = process.argv.slice(2);
+const [base = "http://localhost:8090", usuario = "", contrasena = ""] = process.argv.slice(2);
 const H = { "x-kromo": "1", "content-type": "application/json" };
 const check = (cond: unknown, msg: string) => {
   if (!cond) throw new Error(`✗ ${msg}`);
@@ -15,9 +16,15 @@ const salud = (await fetch(`${base}/salud`).then((r) => r.json())) as any;
 check(salud.ok && salud.modo === "servidor", `salud: modo ${salud.modo}, base ${salud.base_de_datos}, versión ${salud.version}`);
 check((await fetch(`${base}/api/acciones/resumen`, { method: "POST", headers: H })).status === 401, "la API sin sesión responde 401");
 
-const login = await fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin }) });
-check(login.ok, "login con PIN de dueño");
-const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
+const info = (await fetch(`${base}/api/sesion`).then((r) => r.json())) as any;
+check(typeof info.despliegue === "string", `despliegue detectado: ${info.despliegue}`);
+if (info.registro) {
+  const r = await fetch(`${base}/api/registro`, { method: "POST", headers: H, body: JSON.stringify({ nombre: "Dueño", usuario, contrasena }) });
+  check(r.ok, `primer registro: dueño "${usuario}" creado`);
+}
+const login = await fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ usuario, contrasena }) });
+check(login.ok, "login con usuario y contraseña de dueño");
+const cookie = login.headers.getSetCookie().find((c) => c.startsWith("kromo_sesion="))!.split(";")[0]!;
 const post = (name: string, body: unknown) =>
   fetch(`${base}/api/acciones/${name}`, { method: "POST", headers: { ...H, cookie }, body: JSON.stringify(body) }).then((r) => r.json() as Promise<any>);
 

@@ -21,7 +21,9 @@ async function arrancar(port: number, extra: Record<string, string> = {}) {
 
 const local = await arrancar(4710);
 const servidor = await arrancar(4711, { KROMO_MODO: "servidor", KROMO_PIN_INICIAL: "24681357" });
-for (const port of [4710, 4711]) {
+// Docker recién instalado: sin usuarios, toca el primer registro.
+const docker = await arrancar(4712, { KROMO_MODO: "servidor", KROMO_DESPLIEGUE: "docker" });
+for (const port of [4710, 4711, 4712]) {
   for (let i = 0; i < 100 && !(await fetch(`http://localhost:${port}/salud`).then((r) => r.ok).catch(() => false)); i++) await Bun.sleep(100);
 }
 
@@ -58,8 +60,9 @@ try {
     }
     const serv = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
     await serv.goto("http://localhost:4711/");
-    await serv.getByLabel("Tu PIN").fill("24681357");
-    await serv.getByRole("button", { name: "Entrar" }).click();
+    await serv.getByLabel("Usuario").fill("dueno");
+    await serv.getByLabel("Contraseña").fill("24681357");
+    await serv.getByRole("button", { name: "Entrar", exact: true }).click();
     await serv.getByRole("navigation", { name: "Secciones" }).first().waitFor({ timeout: 5000 });
     await serv.goto("http://localhost:4711/#/ajustes");
     await serv.getByRole("tab", { name: "Conectar IA" }).waitFor({ timeout: 5000 });
@@ -68,7 +71,46 @@ try {
     await serv.getByRole("button", { name: "ChatGPT" }).click();
     await serv.locator("details.mas summary").first().click();
     await auditar(serv, `${tema} · ajustes › ChatGPT y otros agentes (modo servidor)`);
+    await serv.getByRole("tab", { name: "Dominio" }).click();
+    await serv.waitForTimeout(300);
+    await auditar(serv, `${tema} · ajustes › Dominio (modo servidor)`);
+    await serv.getByRole("tab", { name: "Usuarios" }).click();
+    await serv.getByRole("button", { name: /^Editar a / }).first().click();
+    await serv.waitForSelector("[role=dialog]");
+    await auditar(serv, `${tema} · editar usuario`);
+    await serv.keyboard.press("Escape");
     await serv.close();
+
+    // Docker: primer registro → Conectar IA (Docker), Negocio con la tarjeta de la nube, aviso y PIN de caja.
+    const dk = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
+    await dk.addInitScript(() => localStorage.setItem("kromo-aviso-nube", "0"));
+    await dk.goto("http://localhost:4712/");
+    if (tema === "light") {
+      await dk.getByRole("heading", { name: "Crea tu cuenta" }).waitFor({ timeout: 5000 });
+      await auditar(dk, `${tema} · primer registro`);
+      await dk.getByLabel("Tu nombre").fill("Rosa");
+      await dk.getByLabel("Usuario", { exact: true }).fill("rosa");
+      await dk.getByLabel("Contraseña", { exact: true }).fill("rosa-12345");
+      await dk.getByLabel("Repite la contraseña").fill("rosa-12345");
+      await dk.getByLabel("PIN de caja (opcional)").fill("4321");
+      await dk.getByRole("button", { name: "Crear cuenta y entrar" }).click();
+    } else {
+      await dk.getByLabel("Usuario").fill("rosa");
+      await dk.getByLabel("Contraseña").fill("rosa-12345");
+      await dk.getByRole("button", { name: "Entrar", exact: true }).click();
+    }
+    await dk.getByRole("navigation", { name: "Secciones" }).first().waitFor({ timeout: 5000 });
+    await dk.goto("http://localhost:4712/#/ajustes");
+    await dk.getByRole("tab", { name: "Conectar IA" }).click();
+    await dk.waitForTimeout(300);
+    await auditar(dk, `${tema} · ajustes › Conectar IA (Docker) con aviso de la nube`);
+    await dk.getByRole("tab", { name: "Negocio" }).click();
+    await dk.waitForTimeout(300);
+    await auditar(dk, `${tema} · ajustes › Negocio (Docker, tarjeta de la nube)`);
+    await dk.getByRole("button", { name: "Cambiar de cajero" }).first().click();
+    await dk.getByLabel("PIN de caja").waitFor({ timeout: 5000 });
+    await auditar(dk, `${tema} · PIN de caja`);
+    await dk.close();
     // Panel de producto abierto.
     await page.goto("http://localhost:4710/#/productos");
     await page.waitForTimeout(600);
@@ -86,7 +128,7 @@ try {
 
     const login = await nuevaPagina({ viewport: { width: 1440, height: 900 }, colorScheme: tema });
     await login.goto("http://localhost:4711/");
-    await login.getByLabel("Tu PIN").waitFor({ timeout: 5000 }); // si la app no carga, la auditoría falla en vez de revisar una página vacía
+    await login.getByLabel("Contraseña").waitFor({ timeout: 5000 }); // si la app no carga, la auditoría falla en vez de revisar una página vacía
     await auditar(login, `${tema} · login`);
     await login.close();
   }
@@ -221,6 +263,7 @@ try {
   await browser.close();
   local.kill();
   servidor.kill();
+  docker.kill();
 }
 console.log(fallas ? `\n${fallas} problemas` : "\nSin violaciones WCAG 2.2 AA detectadas");
 process.exit(fallas ? 1 : 0);

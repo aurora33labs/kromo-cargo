@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { z } from "zod";
-import { insertMovimiento, insertProducto, revertirMovimientos, round2, updateProducto, type ProductoRow } from "../lib.ts";
+import { aCsv, insertMovimiento, insertProducto, revertirMovimientos, round2, updateProducto, type ProductoRow } from "../lib.ts";
 import { listarProductos, norm } from "./productos.ts";
 
 // ── Lectura de archivos ──────────────────────────────────────────────
@@ -239,12 +239,7 @@ export const exportarProductos = defineAction({
     const nombre = `productos-${new Date().toISOString().slice(0, 10)}-${Date.now().toString(36)}.${formato}`;
     const ruta = join(dir, nombre);
     if (formato === "csv") {
-      const esc = (v: unknown) => {
-        const s = v === null || v === undefined ? "" : String(v);
-        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      };
-      const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => esc(c === "stock" ? round2(r.stock) : (r as any)[c])).join(","))].join("\r\n");
-      writeFileSync(ruta, "﻿" + csv); // BOM para que Excel respete los acentos
+      writeFileSync(ruta, aCsv(cols, rows.map((r) => ({ ...r, stock: round2(r.stock) }))));
     } else {
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Productos");

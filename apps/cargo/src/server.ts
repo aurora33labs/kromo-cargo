@@ -12,14 +12,15 @@ import { timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { VERSION, mcpOptions, type App } from "./app.ts";
-import { establecerModo, type Modo } from "./config.ts";
+import { establecerDominio, establecerModo, modo as modoProceso, type Modo } from "./config.ts";
 import { ahora, getConfig } from "./lib.ts";
 import ui from "./ui/index.html";
 import icono192 from "./ui/assets/icon-192.png" with { type: "file" };
 import icono512 from "./ui/assets/icon-512.png" with { type: "file" };
 import logoSvg from "./ui/assets/logo.svg" with { type: "text" };
 
-const ARCHIVOS = ["fotos", "etiquetas", "exportaciones"];
+const ARCHIVOS = ["fotos", "etiquetas", "exportaciones", "respaldos"];
+const DESCARGAS = ["exportaciones", "respaldos"];
 const SUBIDAS_EXT = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".csv", ".txt", ".tsv", ".xlsx"];
 const FIRMA_TTL_S = 60 * 60;
 
@@ -47,25 +48,53 @@ export interface ServeOptions {
   modo: Modo;
 }
 
-/** En modo servidor, crea el primer dueño con KROMO_PIN_INICIAL y deja el PIN obligatorio. */
+const hayUsuarios = async (app: App) => Number((await app.db.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM usuarios"))?.n ?? 0) > 0;
+
+/**
+ * En modo servidor el inicio de sesión es obligatorio. Sin usuarios, la UI muestra "Crea tu cuenta"
+ * (primer registro). KROMO_PIN_INICIAL, si existe, crea un dueño "dueno" con esa contraseña provisional
+ * (despliegues automatizados).
+ */
 export async function prepararServidor(app: App, modo: Modo, env = process.env) {
   if (!modo.servidor) return;
-  const n = Number((await app.db.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM usuarios WHERE activo = 1"))?.n ?? 0);
-  if (n === 0) {
-    const pin = env.KROMO_PIN_INICIAL ?? "";
-    if (!/^\d{6,12}$/.test(pin)) {
-      throw new Error(
-        "Modo servidor sin usuarios: define KROMO_PIN_INICIAL (6 a 12 dígitos) para crear al primer dueño. " +
-          "En Railway, agrégala en Variables.",
-      );
-    }
-    await app.db.run("INSERT INTO usuarios (nombre, rol, pin_hash, creado_en) VALUES (?, 'dueno', ?, ?)", [
+  const inicial = env.KROMO_PIN_INICIAL ?? "";
+  if (!(await hayUsuarios(app)) && inicial) {
+    if (inicial.length < 6) throw new Error("KROMO_PIN_INICIAL debe tener al menos 6 caracteres.");
+    await app.db.run("INSERT INTO usuarios (nombre, usuario, rol, pin_hash, password_hash, creado_en) VALUES (?, 'dueno', 'dueno', '', ?, ?)", [
       env.KROMO_DUENO || "Dueño",
-      await Bun.password.hash(pin),
+      await Bun.password.hash(inicial),
       ahora(),
     ]);
   }
   await app.db.run("UPDATE configuracion SET valor = '1' WHERE clave = 'requerir_pin'");
+}
+
+const USUARIO_RE = /^[a-z0-9._-]{3,40}$/;
+// Hash de relleno: verificar contra él cuando el usuario no existe iguala los tiempos de respuesta.
+const HASH_RELLENO = Bun.password.hashSync("relleno-para-tiempos-iguales");
+
+/** Usuario y contraseña. Usuarios anteriores a la v2 (sin usuario) entran con su nombre y su PIN. */
+export async function verificarCredenciales(app: App, usuario: string, contrasena: string): Promise<(Identidad & { pendiente?: boolean }) | null> {
+  const u = usuario.toLowerCase().replace(/\s/g, "");
+  if (!u || !contrasena || contrasena.length > 200) return null;
+  const row = await app.db.get("SELECT nombre, rol, password_hash FROM usuarios WHERE activo = 1 AND usuario = ?", [u]);
+  if (row?.password_hash) return (await Bun.password.verify(contrasena, row.password_hash)) ? { usuario: row.nombre, rol: row.rol } : null;
+  const antiguo = await app.db.get(
+    "SELECT nombre, rol, pin_hash FROM usuarios WHERE activo = 1 AND password_hash IS NULL AND REPLACE(LOWER(nombre), ' ', '') = ? AND pin_hash <> ''",
+    [u],
+  );
+  if (antiguo && (await Bun.password.verify(contrasena, antiguo.pin_hash))) return { usuario: antiguo.nombre, rol: antiguo.rol, pendiente: true };
+  await Bun.password.verify(contrasena, HASH_RELLENO);
+  return null;
+}
+
+/** PIN de caja: solo entre usuarios activos con PIN. */
+async function verificarPinCaja(app: App, pin: string): Promise<Identidad | null> {
+  if (!/^\d{4,12}$/.test(pin)) return null;
+  for (const u of await app.db.all("SELECT nombre, rol, pin_hash FROM usuarios WHERE activo = 1 AND pin_hash <> ''")) {
+    if (await Bun.password.verify(pin, u.pin_hash)) return { usuario: u.nombre, rol: u.rol };
+  }
+  return null;
 }
 
 /** Secreto para firmar enlaces de descarga. Se genera una vez y se guarda en la base. */
@@ -79,9 +108,12 @@ async function secretoArchivos(app: App): Promise<string> {
 }
 
 export async function startServer(app: App, opts: ServeOptions) {
-  const { modo } = opts;
-  establecerModo(modo);
+  // A partir de aquí se usa el modo del proceso: las acciones (p. ej. el dominio propio) lo cambian en vivo.
+  establecerModo(opts.modo);
+  const modo = modoProceso;
   await prepararServidor(app, modo);
+  const dominioGuardado = (await getConfig(app.db)).dominio;
+  if (modo.servidor && dominioGuardado) establecerDominio(dominioGuardado);
   const secreto = await secretoArchivos(app);
   const hmac = (s: string) => new Bun.CryptoHasher("sha256", secreto).update(s).digest("hex").slice(0, 32);
   const firmar = (rel: string) => {
@@ -99,12 +131,6 @@ export async function startServer(app: App, opts: ServeOptions) {
   let auth!: Auth;
   let ipDe: (req: Request) => string = () => "local";
 
-  const verificarPin = async (pin: string): Promise<Identidad | null> => {
-    if (!/^\d{4,12}$/.test(pin)) return null;
-    const usuarios = await app.db.all("SELECT nombre, rol, pin_hash FROM usuarios WHERE activo = 1");
-    for (const u of usuarios) if (await Bun.password.verify(pin, u.pin_hash)) return { usuario: u.nombre, rol: u.rol };
-    return null;
-  };
 
   const getActor = async (req: Request): Promise<Actor | Response> => {
     if (!modo.servidor && (await getConfig(app.db)).requerir_pin !== "1") return { tipo: "humano", cliente: "ui", usuario: "Dueño", rol: "dueno" };
@@ -115,6 +141,132 @@ export async function startServer(app: App, opts: ServeOptions) {
   let mcpHttp: ((req: Request) => Promise<Response>) | null = null;
 
   const hsts = modo.servidor && (modo.urlPublica ?? "").startsWith("https://");
+  const conCookies = (data: unknown, cookies: string[], status = 200) => {
+    const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
+    for (const c of cookies) headers.append("set-cookie", c);
+    return new Response(JSON.stringify(data), { status, headers });
+  };
+
+  /** Abre sesión y marca el navegador como equipo de confianza (para cambiar de cajero con PIN). */
+  const entrar = async (id: Identidad & { pendiente?: boolean }, conEquipo: boolean) => {
+    const cookies = [auth.cookieSesion(await auth.crearSesion(id))];
+    if (conEquipo) cookies.push(auth.cookieEquipo(await auth.crearEquipo(id.usuario)));
+    return conCookies({ ok: true, usuario: { nombre: id.usuario, rol: id.rol, pendiente: !!id.pendiente } }, cookies);
+  };
+
+  const requiereLogin = async () => modo.servidor || (await getConfig(app.db)).requerir_pin === "1";
+
+  const sesionApi = async (req: Request, p: string): Promise<Response> => {
+    const ip = ipDe(req);
+    const cuerpo = async () => ((await req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+    const frenar = async () => {
+      auth.limitador.fallo(ip);
+      await Bun.sleep(400);
+    };
+
+    if (p === "/api/sesion" && req.method === "GET") {
+      const cfg = await getConfig(app.db);
+      const actor = await getActor(req);
+      const usuario = actor instanceof Response ? null : { nombre: actor.usuario, rol: actor.rol, pendiente: false };
+      if (usuario && (await requiereLogin())) {
+        const u = await app.db.get("SELECT password_hash FROM usuarios WHERE nombre = ? AND activo = 1", [usuario.nombre]);
+        usuario.pendiente = !!u && !u.password_hash;
+      }
+      const hayPin = Number((await app.db.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM usuarios WHERE activo = 1 AND pin_hash <> ''"))?.n ?? 0) > 0;
+      return json({
+        negocio: cfg.nombre_negocio,
+        requiere_pin: await requiereLogin(),
+        modo: modo.servidor ? "servidor" : "local",
+        despliegue: modo.despliegue,
+        registro: modo.servidor && !(await hayUsuarios(app)),
+        equipo: hayPin && (await auth.equipoValido(req)),
+        version: VERSION,
+        usuario,
+      });
+    }
+
+    if (p === "/api/sesion" && req.method === "POST") {
+      if (auth.limitador.bloqueado(ip)) return json({ ok: false, error: "Demasiados intentos. Espera unos minutos." }, 429);
+      const b = await cuerpo();
+      const id = await verificarCredenciales(app, String(b.usuario ?? ""), String(b.contrasena ?? ""));
+      if (!id) {
+        await frenar();
+        return json({ ok: false, error: "Usuario o contraseña incorrectos" }, 401);
+      }
+      auth.limitador.exito(ip);
+      return entrar(id, true);
+    }
+
+    if (p === "/api/sesion/pin" && req.method === "POST") {
+      if (!(await auth.equipoValido(req))) return json({ ok: false, error: "En este equipo entra primero con usuario y contraseña." }, 403);
+      if (auth.limitador.bloqueado(ip)) return json({ ok: false, error: "Demasiados intentos. Espera unos minutos." }, 429);
+      const id = await verificarPinCaja(app, String((await cuerpo()).pin ?? ""));
+      if (!id) {
+        await frenar();
+        return json({ ok: false, error: "PIN incorrecto" }, 401);
+      }
+      auth.limitador.exito(ip);
+      return entrar(id, false);
+    }
+
+    if (p === "/api/sesion" && req.method === "DELETE") {
+      // Bloquear conserva el equipo (se vuelve a entrar con PIN); "olvidar" lo desvincula.
+      await auth.cerrarSesion(req);
+      const cookies = [auth.cookieSesion(null)];
+      if (new URL(req.url).searchParams.get("olvidar") === "1") {
+        await auth.olvidarEquipo(req);
+        cookies.push(auth.cookieEquipo(null));
+      }
+      return conCookies({ ok: true }, cookies);
+    }
+
+    if (p === "/api/registro" && req.method === "POST") {
+      if (!modo.servidor) return json({ ok: false, error: "El registro es solo para la app en servidor." }, 400);
+      if (auth.limitador.bloqueado(ip)) return json({ ok: false, error: "Demasiados intentos. Espera unos minutos." }, 429);
+      const b = await cuerpo();
+      const datos = validarCuenta(b);
+      if ("error" in datos) return json({ ok: false, error: datos.error }, 400);
+      const nombre = String(b.nombre ?? "").trim().slice(0, 60);
+      const negocio = String(b.negocio ?? "").trim().slice(0, 120);
+      const pin = String(b.pin ?? "");
+      if (!nombre) return json({ ok: false, error: "Escribe tu nombre." }, 400);
+      if (pin && !/^\d{4,12}$/.test(pin)) return json({ ok: false, error: "El PIN de caja debe tener de 4 a 12 dígitos." }, 400);
+      const [password_hash, pin_hash] = [await Bun.password.hash(datos.contrasena), pin ? await Bun.password.hash(pin) : ""];
+      // El primero gana: el INSERT solo ocurre si la tabla sigue vacía, dentro de la misma transacción.
+      const creado = await app.db.transaction(async (tx) => {
+        if (Number((await tx.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM usuarios"))?.n ?? 0) > 0) return false;
+        await tx.run("INSERT INTO usuarios (nombre, usuario, rol, pin_hash, password_hash, creado_en) VALUES (?, ?, 'dueno', ?, ?, ?)", [
+          nombre,
+          datos.usuario,
+          pin_hash,
+          password_hash,
+          ahora(),
+        ]);
+        if (negocio) await tx.run("UPDATE configuracion SET valor = ? WHERE clave = 'nombre_negocio'", [negocio]);
+        return true;
+      });
+      if (!creado) return json({ ok: false, error: "Esta app ya tiene dueño. Inicia sesión." }, 409);
+      return entrar({ usuario: nombre, rol: "dueno" }, true);
+    }
+
+    if (p === "/api/cuenta" && req.method === "POST") {
+      // Usuario anterior a la v2: define su usuario y contraseña la primera vez que entra.
+      const actor = await getActor(req);
+      if (actor instanceof Response) return actor;
+      const u = await app.db.get("SELECT id, password_hash FROM usuarios WHERE nombre = ? AND activo = 1", [actor.usuario]);
+      if (!u || u.password_hash) return json({ ok: false, error: "Tu cuenta ya tiene usuario y contraseña." }, 400);
+      const datos = validarCuenta(await cuerpo());
+      if ("error" in datos) return json({ ok: false, error: datos.error }, 400);
+      if (await app.db.get("SELECT id FROM usuarios WHERE usuario = ? AND id <> ?", [datos.usuario, u.id])) {
+        return json({ ok: false, error: "Ese usuario ya existe. Elige otro." }, 400);
+      }
+      await app.db.run("UPDATE usuarios SET usuario = ?, password_hash = ? WHERE id = ?", [datos.usuario, await Bun.password.hash(datos.contrasena), u.id]);
+      return entrar({ usuario: actor.usuario!, rol: actor.rol! }, true);
+    }
+
+    return json({ ok: false, error: "No encontrado" }, 404);
+  };
+
   const handler = async (req: Request): Promise<Response> => conCabeceras(await manejar(req), hsts);
 
   // En producción Bun sirve el HTML de la UI en una ruta interna que no pasa por el handler (sin
@@ -153,39 +305,10 @@ export async function startServer(app: App, opts: ServeOptions) {
       if (p === "/mcp") return mcpHttp!(req);
     }
 
-    if (p === "/api/sesion") {
+    if (p.startsWith("/api/sesion") || p === "/api/registro" || p === "/api/cuenta") {
       const blocked = guardRequest(req, modo.hosts);
       if (blocked) return blocked;
-      const cfg = await getConfig(app.db);
-      if (req.method === "GET") {
-        const actor = await getActor(req);
-        return json({
-          negocio: cfg.nombre_negocio,
-          requiere_pin: modo.servidor || cfg.requerir_pin === "1",
-          modo: modo.servidor ? "servidor" : "local",
-          usuario: actor instanceof Response ? null : { nombre: actor.usuario, rol: actor.rol },
-        });
-      }
-      if (req.method === "POST") {
-        const ip = ipDe(req);
-        if (auth.limitador.bloqueado(ip)) return json({ ok: false, error: "Demasiados intentos. Espera unos minutos." }, 429);
-        const { pin } = (await req.json().catch(() => ({}))) as { pin?: string };
-        const id = await verificarPin(String(pin ?? ""));
-        if (!id) {
-          auth.limitador.fallo(ip);
-          await Bun.sleep(400);
-          return json({ ok: false, error: "PIN incorrecto" }, 401);
-        }
-        auth.limitador.exito(ip);
-        const token = await auth.crearSesion(id);
-        return new Response(JSON.stringify({ ok: true, usuario: { nombre: id.usuario, rol: id.rol } }), {
-          headers: { "content-type": "application/json", "set-cookie": auth.cookieSesion(token) },
-        });
-      }
-      if (req.method === "DELETE") {
-        await auth.cerrarSesion(req);
-        return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json", "set-cookie": auth.cookieSesion(null) } });
-      }
+      return sesionApi(req, p);
     }
 
     if (p === "/api/subir" && req.method === "POST") {
@@ -218,12 +341,13 @@ export async function startServer(app: App, opts: ServeOptions) {
       if (!firmaValida(p, url.searchParams.get("f"))) {
         const actor = await getActor(req);
         if (actor instanceof Response) return new Response("No autorizado", { status: 401 });
+        if (m[1] === "respaldos" && actor.rol !== "dueno") return new Response("Solo un dueño puede descargar respaldos", { status: 403 });
       }
       const name = basename(decodeURIComponent(m[2]!));
       const f = Bun.file(join(app.dataDir, m[1]!, name));
       if (!(await f.exists())) return new Response("No encontrado", { status: 404 });
       const headers: Record<string, string> = { "cache-control": "no-store" };
-      if (m[1] === "exportaciones") headers["content-disposition"] = `attachment; filename="${name}"`;
+      if (DESCARGAS.includes(m[1]!)) headers["content-disposition"] = `attachment; filename="${name}"`;
       return new Response(f, { headers });
     }
     return new Response("No encontrado", { status: 404 });
@@ -255,10 +379,17 @@ export async function startServer(app: App, opts: ServeOptions) {
   ipDe = modo.servidor
     ? (req) => req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || srv.requestIP(req)?.address || "?"
     : (req) => srv.requestIP(req)?.address ?? "local";
-  auth = new Auth({ db: app.db, urlPublica: url, nombreApp: (await getConfig(app.db)).nombre_negocio ?? "Kromo Cargo", logoSvg, verificarPin });
+  const urlActual = () => modo.urlPublica ?? url;
+  auth = new Auth({
+    db: app.db,
+    urlPublica: urlActual,
+    nombreApp: (await getConfig(app.db)).nombre_negocio ?? "Kromo Cargo",
+    logoSvg,
+    verificarCredenciales: (u, c) => verificarCredenciales(app, u, c),
+  });
   mcpHttp = createMcpHttpHandler(app.registry, mcpOptions(app), auth);
   if (modo.servidor) {
-    app.registry.configurarArchivos({ rutasPermitidas: join(app.dataDir, "subidas"), urlArchivo: (rel) => `${url}${firmar(rel)}` });
+    app.registry.configurarArchivos({ rutasPermitidas: join(app.dataDir, "subidas"), urlArchivo: (rel) => `${urlActual()}${firmar(rel)}` });
   }
 
   const infoFile = join(app.dataDir, "servidor.json");
@@ -272,6 +403,16 @@ export async function startServer(app: App, opts: ServeOptions) {
 
   if (opts.open && !modo.servidor) abrirNavegador(url);
   return { server: srv, url };
+}
+
+/** Valida usuario (3-40: letras, números, punto, guion) y contraseña (8+). */
+export function validarCuenta(b: Record<string, unknown>): { usuario: string; contrasena: string } | { error: string } {
+  const usuario = String(b.usuario ?? "").trim().toLowerCase();
+  const contrasena = String(b.contrasena ?? "");
+  if (!USUARIO_RE.test(usuario)) return { error: "El usuario debe tener de 3 a 40 letras, números, punto o guion, sin espacios." };
+  if (contrasena.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };
+  if (contrasena.length > 200) return { error: "La contraseña es demasiado larga." };
+  return { usuario, contrasena };
 }
 
 /** Política para la UI: solo recursos propios; fuentes e imágenes también como data:/blob:. */

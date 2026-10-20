@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { fechaLocal, money, qty, useData } from "../api.ts";
-import { EmptyState, Field, Segmented } from "../components.tsx";
+import { EmptyState, Field, Icon, Segmented, useAction } from "../components.tsx";
 import { useVersion } from "../version.ts";
 
 const RANGOS = [
@@ -94,6 +94,7 @@ function BarrasPorDia({ filas, desde, hasta }: { filas: { grupo: string; importe
 
 export function Reportes() {
   const version = useVersion();
+  const run = useAction();
   const [rango, setRango] = useState<string>("30");
   const [desdeC, setDesdeC] = useState(fechaLocal(-6));
   const [hastaC, setHastaC] = useState(fechaLocal(0));
@@ -121,6 +122,16 @@ export function Reportes() {
             </div>
           )}
           <Segmented label="Periodo" value={rango} options={[...RANGOS.map((x) => [x.id, x.label] as const), ["custom", "Otro rango"] as const]} onChange={setRango} />
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              const r = await run("exportar_ventas", { desde, hasta }, { exito: (x) => `Se exportaron ${x.lineas} líneas de venta` });
+              if (r?.url) location.assign(r.url);
+            }}
+          >
+            <Icon name="download" /> Exportar CSV
+          </button>
         </div>
       </div>
 

@@ -2,15 +2,16 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { App } from "../src/app.ts";
-import { establecerModo, leerModo, type Modo } from "../src/config.ts";
+import { detectarDespliegue, establecerModo, leerModo, normalizarDominio, type Modo } from "../src/config.ts";
 import { Limitador } from "@kromo/core";
 import { startServer } from "../src/server.ts";
 import { MOTOR, testApp } from "./helpers.ts";
 
 const PORT = 4650;
 const BASE = `http://localhost:${PORT}`;
+const CLAVE = "lupe-secreta-1";
 const PIN = "246810";
-const modo: Modo = { servidor: true, urlPublica: BASE, hosts: ["localhost", "127.0.0.1"], pinMinimo: 6 };
+const modo: Modo = { servidor: true, urlPublica: BASE, urlBase: BASE, hosts: ["localhost", "127.0.0.1"], pinMinimo: 4, despliegue: "railway" };
 const H = { "x-kromo": "1", "content-type": "application/json" };
 
 let app: App;
@@ -22,6 +23,10 @@ const parse = (r: any) => JSON.parse(r.content[0].text);
 const post = (name: string, body: unknown, headers: Record<string, string> = { ...H, cookie }) =>
   fetch(`${BASE}/api/acciones/${name}`, { method: "POST", headers, body: JSON.stringify(body) }).then((r) => r.json() as Promise<any>);
 
+const entrar = (usuario: string, contrasena: string, extra: Record<string, string> = {}) =>
+  fetch(`${BASE}/api/sesion`, { method: "POST", headers: { ...H, ...extra }, body: JSON.stringify({ usuario, contrasena }) });
+const galleta = (r: Response, nombre: string) => r.headers.getSetCookie().find((c) => c.startsWith(`${nombre}=`))!.split(";")[0]!;
+
 async function mcpCon(token: string, nombre = "prueba") {
   const client = new Client({ name: nombre, version: "1" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { authorization: `Bearer ${token}` } } }));
@@ -30,21 +35,23 @@ async function mcpCon(token: string, nombre = "prueba") {
 
 beforeAll(async () => {
   ({ app, cleanup } = await testApp());
-  // Sin PIN inicial, el modo servidor no arranca (nadie podría entrar… o cualquiera podría reclamarlo).
+  // Sin variables: arranca y espera el primer registro desde la UI.
   delete process.env.KROMO_PIN_INICIAL;
-  await expect(startServer(app, { port: PORT, open: false, modo })).rejects.toThrow("KROMO_PIN_INICIAL");
-  process.env.KROMO_PIN_INICIAL = PIN;
-  process.env.KROMO_DUENO = "Lupe";
   const { server } = await startServer(app, { port: PORT, open: false, modo });
   stop = () => server.stop(true);
-  const login = await fetch(`${BASE}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin: PIN }) });
-  cookie = login.headers.get("set-cookie")!.split(";")[0]!;
+  const info = (await fetch(`${BASE}/api/sesion`).then((r) => r.json())) as any;
+  expect(info).toMatchObject({ registro: true, requiere_pin: true, despliegue: "railway", usuario: null });
+  // Dos registros al mismo tiempo: solo uno crea al dueño.
+  const datos = { negocio: "Abarrotes Lupe", nombre: "Lupe", usuario: "lupe", contrasena: CLAVE, pin: PIN };
+  const registro = () => fetch(`${BASE}/api/registro`, { method: "POST", headers: H, body: JSON.stringify(datos) });
+  const rs = await Promise.all([registro(), registro()]);
+  expect(rs.map((r) => r.status).sort()).toEqual([200, 409]);
+  expect(Number((await app.db.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM usuarios"))!.n)).toBe(1);
+  cookie = galleta(rs.find((r) => r.status === 200)!, "kromo_sesion");
 });
 afterAll(async () => {
   stop();
   await cleanup();
-  delete process.env.KROMO_PIN_INICIAL;
-  delete process.env.KROMO_DUENO;
   establecerModo(leerModo({})); // las demás pruebas corren en modo local
 });
 
@@ -60,15 +67,14 @@ describe(`modo servidor (${MOTOR})`, () => {
     expect(sin.status).toBe(401);
     expect((await post("resumen", {})).ok).toBe(true);
     const info = (await fetch(`${BASE}/api/sesion`, { headers: { cookie } }).then((r) => r.json())) as any;
-    expect(info.usuario).toEqual({ nombre: "Lupe", rol: "dueno" });
+    expect(info).toMatchObject({ negocio: "Abarrotes Lupe", registro: false, usuario: { nombre: "Lupe", rol: "dueno", pendiente: false } });
     expect((await post("configurar_negocio", { requerir_pin: false })).error).toContain("obligatorio");
-    const corto = await post("guardar_usuario", { nombre: "Beto", rol: "empleado", pin: "1234" });
-    expect(corto.error).toContain("6 dígitos");
+    expect((await fetch(`${BASE}/api/registro`, { method: "POST", headers: H, body: JSON.stringify({ nombre: "X", usuario: "otro", contrasena: "12345678" }) })).status).toBe(409);
   });
 
   test("las sesiones se guardan en la base (sobreviven reinicios) y se cierran", async () => {
-    const l = await fetch(`${BASE}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin: PIN }) });
-    const c = l.headers.get("set-cookie")!.split(";")[0]!;
+    const l = await entrar("lupe", CLAVE);
+    const c = galleta(l, "kromo_sesion");
     const n = await app.db.get("SELECT CAST(COUNT(*) AS INTEGER) AS n FROM sesiones");
     expect(Number(n.n)).toBeGreaterThanOrEqual(2);
     await fetch(`${BASE}/api/sesion`, { method: "DELETE", headers: { ...H, cookie: c } });
@@ -81,19 +87,91 @@ describe(`modo servidor (${MOTOR})`, () => {
     expect(r.status).toBe(403);
   });
 
-  test("bloquea la fuerza bruta del PIN por IP", async () => {
-    const intento = () =>
-      fetch(`${BASE}/api/sesion`, { method: "POST", headers: { ...H, "x-forwarded-for": "203.0.113.7" }, body: JSON.stringify({ pin: "000000" }) });
+  test("bloquea la fuerza bruta de la contraseña por IP", async () => {
+    const intento = () => entrar("lupe", "no-es-esta", { "x-forwarded-for": "203.0.113.7" });
     for (let i = 0; i < 5; i++) expect((await intento()).status).toBe(401);
     expect((await intento()).status).toBe(429);
     // Inventar una IP al inicio de X-Forwarded-For no sirve para saltarse el bloqueo.
-    const falsa = await fetch(`${BASE}/api/sesion`, {
-      method: "POST",
-      headers: { ...H, "x-forwarded-for": "1.1.1.1, 203.0.113.7" },
-      body: JSON.stringify({ pin: PIN }),
-    });
-    expect(falsa.status).toBe(429);
+    expect((await entrar("lupe", CLAVE, { "x-forwarded-for": "1.1.1.1, 203.0.113.7" })).status).toBe(429);
   }, 20000);
+
+  test("PIN de caja: solo en un equipo donde ya se entró con contraseña, y los PIN no se repiten", async () => {
+    const pinCon = (headers: Record<string, string>) => fetch(`${BASE}/api/sesion/pin`, { method: "POST", headers: { ...H, ...headers }, body: JSON.stringify({ pin: PIN }) });
+    expect((await pinCon({})).status).toBe(403);
+    const l = await entrar("lupe", CLAVE, { "x-forwarded-for": "192.0.2.10" });
+    const equipo = galleta(l, "kromo_equipo");
+    const r = await pinCon({ cookie: equipo, "x-forwarded-for": "192.0.2.10" });
+    expect(r.status).toBe(200);
+    expect(((await r.json()) as any).usuario.nombre).toBe("Lupe");
+    expect((await fetch(`${BASE}/api/sesion`, { headers: { cookie: equipo } }).then((x) => x.json()) as any).equipo).toBe(true);
+    const dup = await post("guardar_usuario", { nombre: "Beto", usuario: "beto", contrasena: "beto-12345", rol: "empleado", pin: PIN });
+    expect(dup.error).toContain("ya lo usa");
+    // Olvidar el equipo: ya no se entra con PIN desde ahí.
+    await fetch(`${BASE}/api/sesion?olvidar=1`, { method: "DELETE", headers: { ...H, cookie: equipo } });
+    expect((await pinCon({ cookie: equipo, "x-forwarded-for": "192.0.2.10" })).status).toBe(403);
+  });
+
+  test("usuarios: debe quedar un dueño activo; cambiar el acceso cierra sus sesiones", async () => {
+    const lista = (await post("listar_usuarios", {})).resultado;
+    const lupe = lista.find((u: any) => u.nombre === "Lupe");
+    expect(lupe).toMatchObject({ usuario: "lupe", tiene_pin: true, pendiente: false });
+    expect((await post("guardar_usuario", { id: lupe.id, nombre: "Lupe", rol: "empleado" })).error).toContain("al menos un dueño");
+    expect((await post("guardar_usuario", { id: lupe.id, nombre: "Lupe", rol: "dueno", activo: false })).error).toContain("al menos un dueño");
+    const nuevo = await post("guardar_usuario", { nombre: "Ana", usuario: "ana", contrasena: "ana-12345", rol: "empleado" });
+    const ca = galleta(await entrar("ana", "ana-12345"), "kromo_sesion");
+    expect((await post("resumen", {}, { ...H, cookie: ca })).ok).toBe(true);
+    await post("guardar_usuario", { id: nuevo.resultado.id, nombre: "Ana", rol: "empleado", contrasena: "ana-nueva-1" });
+    expect((await fetch(`${BASE}/api/acciones/resumen`, { method: "POST", headers: { ...H, cookie: ca } })).status).toBe(401);
+    expect((await entrar("ana", "ana-nueva-1")).status).toBe(200);
+  });
+
+  test("un usuario de la versión anterior (solo PIN) entra con nombre y PIN y define su usuario", async () => {
+    await app.db.run("INSERT INTO usuarios (nombre, rol, pin_hash, creado_en) VALUES ('Doña Mari', 'empleado', ?, '2026-01-01 00:00:00')", [await Bun.password.hash("135790")]);
+    const l = await entrar("doñamari", "135790"); // la UI quita los espacios del usuario
+    expect(l.status).toBe(200);
+    const c = galleta(l, "kromo_sesion");
+    const info = (await fetch(`${BASE}/api/sesion`, { headers: { cookie: c } }).then((r) => r.json())) as any;
+    expect(info.usuario.pendiente).toBe(true);
+    const cuenta = await fetch(`${BASE}/api/cuenta`, { method: "POST", headers: { ...H, cookie: c }, body: JSON.stringify({ usuario: "mari", contrasena: "mari-12345" }) });
+    expect(cuenta.status).toBe(200);
+    expect((await entrar("doña mari", "135790")).status).toBe(401);
+    expect((await entrar("mari", "mari-12345")).status).toBe(200);
+  });
+
+  test("dominio propio: se acepta como host, cambia la URL pública y se puede quitar", async () => {
+    expect(normalizarDominio("https://Tienda.Example.com/")).toBe("tienda.example.com");
+    expect(normalizarDominio("no es dominio")).toBeNull();
+    expect((await post("configurar_dominio", { dominio: "localhost:8080" })).error).toContain("Escribe solo el dominio");
+    const r = await post("configurar_dominio", { dominio: "tienda.invalid" });
+    expect(r.resultado).toMatchObject({ dominio: "tienda.invalid", url_publica: "https://tienda.invalid", responde: false });
+    expect((await fetch(`${BASE}/api/cambios`, { headers: { host: "tienda.invalid", cookie } })).status).toBe(200);
+    const meta = (await fetch(`${BASE}/.well-known/oauth-protected-resource`).then((x) => x.json())) as any;
+    expect(meta.authorization_servers).toEqual(["https://tienda.invalid"]);
+    expect((await post("ver_configuracion", {})).resultado).toMatchObject({ dominio: "tienda.invalid", url_base: BASE });
+    await post("configurar_dominio", { dominio: null });
+    expect((await fetch(`${BASE}/api/cambios`, { headers: { host: "otro.invalid", cookie } })).status).toBe(403);
+    const meta2 = (await fetch(`${BASE}/.well-known/oauth-protected-resource`).then((x) => x.json())) as any;
+    expect(meta2.authorization_servers).toEqual([BASE]);
+  }, 20000);
+
+  test("respaldo descargable y exportaciones a CSV", async () => {
+    const r = await post("crear_respaldo", {});
+    expect(r.ok).toBe(true);
+    const descarga = await fetch(r.resultado.url);
+    expect(descarga.status).toBe(200);
+    expect(descarga.headers.get("content-disposition")).toContain("attachment");
+    expect((await descarga.arrayBuffer()).byteLength).toBeGreaterThan(100);
+    // Sin firma, un empleado no puede bajar respaldos.
+    const cb = galleta(await entrar("ana", "ana-nueva-1"), "kromo_sesion");
+    expect((await fetch(r.resultado.url.split("?")[0], { headers: { cookie: cb } })).status).toBe(403);
+
+    const v = await post("exportar_ventas", {});
+    expect(v.ok).toBe(true);
+    const csv = await fetch(v.resultado.url).then((x) => x.text());
+    expect(csv).toContain("venta,fecha,metodo_pago,sku,producto");
+    const h = await post("exportar_historial", {});
+    expect(await fetch(h.resultado.url).then((x) => x.text())).toContain("actor_tipo");
+  });
 
   test("MCP sin token responde 401 con la ubicación del servidor de autorización", async () => {
     const r = await fetch(`${BASE}/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
@@ -160,15 +238,16 @@ describe(`modo servidor (${MOTOR})`, () => {
     const otraRedir = await fetch(`${as.authorization_endpoint}?${new URLSearchParams({ ...Object.fromEntries(params), redirect_uri: "https://evil.com/cb" })}`);
     expect(otraRedir.status).toBe(400);
 
-    const enviar = (pin: string) =>
+    expect(html).toContain('autocomplete="username"');
+    const enviar = (contrasena: string) =>
       fetch(as.authorization_endpoint, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "198.51.100.20" },
-        body: new URLSearchParams({ ...Object.fromEntries(params), pin, accion: "permitir" }),
+        body: new URLSearchParams({ ...Object.fromEntries(params), usuario: "lupe", contrasena, accion: "permitir" }),
         redirect: "manual",
       });
-    expect((await enviar("999999")).status).toBe(401);
-    const ok = await enviar(PIN);
+    expect((await enviar("incorrecta")).status).toBe(401);
+    const ok = await enviar(CLAVE);
     expect(ok.status).toBe(302);
     const destino = new URL(ok.headers.get("location")!);
     expect(destino.origin + destino.pathname).toBe(redirect);
@@ -256,6 +335,28 @@ describe(`modo servidor (${MOTOR})`, () => {
     expect((await fetch(et.resultado.url.split("?")[0])).status).toBe(401);
     expect((await fetch(et.resultado.url.split("?")[0], { headers: { cookie } })).status).toBe(200);
     await client.close();
+  });
+});
+
+describe("tipo de despliegue", () => {
+  test("se detecta por variables o se fuerza con KROMO_DESPLIEGUE", () => {
+    expect(detectarDespliegue({ RAILWAY_ENVIRONMENT: "production" }, false)).toBe("railway");
+    expect(detectarDespliegue({}, true)).toBe("docker");
+    expect(detectarDespliegue({ KROMO_EN_DOCKER: "1" }, false)).toBe("docker");
+    expect(detectarDespliegue({}, false)).toBe("local");
+    expect(detectarDespliegue({ KROMO_DESPLIEGUE: "gestionado", RAILWAY_ENVIRONMENT: "x" }, false)).toBe("gestionado");
+    expect(leerModo({ KROMO_MODO: "servidor", KROMO_EN_DOCKER: "1" }, false)).toMatchObject({ servidor: true, despliegue: "docker" });
+  });
+
+  test("KROMO_PIN_INICIAL (opcional) crea un dueño \"dueno\" con esa contraseña", async () => {
+    const { app: otra, cleanup: limpiar } = await testApp();
+    try {
+      const { prepararServidor, verificarCredenciales } = await import("../src/server.ts");
+      await prepararServidor(otra, { ...modo }, { KROMO_PIN_INICIAL: "13579246", KROMO_DUENO: "Rosa" });
+      expect(await verificarCredenciales(otra, "dueno", "13579246")).toMatchObject({ usuario: "Rosa", rol: "dueno" });
+    } finally {
+      await limpiar();
+    }
   });
 });
 

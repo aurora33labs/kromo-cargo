@@ -72,5 +72,15 @@ export const migraciones: MigrationSet = {
         INSERT INTO configuracion (clave, valor) VALUES ('nombre_negocio', 'Mi tienda'), ('moneda', 'MXN'), ('requerir_pin', '0');
       `,
     },
+    {
+      // Acceso con usuario y contraseña; el PIN queda para cambiar de cajero ('' = sin PIN).
+      // Usuarios anteriores (sin usuario/contraseña) entran una vez con su nombre y su PIN y definen ambos.
+      version: 2,
+      sql: `
+        ALTER TABLE usuarios ADD COLUMN usuario TEXT;
+        ALTER TABLE usuarios ADD COLUMN password_hash TEXT;
+        CREATE UNIQUE INDEX usuarios_usuario ON usuarios(usuario);
+      `,
+    },
   ],
 };

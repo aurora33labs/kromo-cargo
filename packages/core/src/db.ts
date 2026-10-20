@@ -223,6 +223,18 @@ const CORE_MIGRATIONS: MigrationSet = {
         );
       `,
     },
+    {
+      // Equipos de confianza: entraron con contraseña y desde ahí se cambia de cajero con PIN.
+      version: 3,
+      sql: `
+        CREATE TABLE equipos (
+          token_hash TEXT PRIMARY KEY,
+          usuario TEXT NOT NULL,
+          expira BIGINT NOT NULL,
+          creado_en TEXT NOT NULL DEFAULT {{ahora}}
+        );
+      `,
+    },
   ],
 };
 
@@ -283,6 +295,23 @@ function backupSqlite(db: SqliteDb, dir: string, etiqueta: string): string {
 export function backupDatabase(db: Db, dir: string, etiqueta = "manual"): string {
   if (db instanceof SqliteDb) return backupSqlite(db, dir, etiqueta);
   throw new Error("Con Postgres usa pg_dump o los respaldos de tu proveedor (Railway → Backups).");
+}
+
+/**
+ * Respaldo descargable para cualquier motor: SQLite copia el archivo; Postgres exporta todas las
+ * tablas a JSON (para pasar los datos a otra instalación o revisarlos). Regresa la ruta del archivo.
+ */
+export async function backupDescargable(db: Db, dir: string): Promise<string> {
+  if (db instanceof SqliteDb) return backupSqlite(db, dir, "descarga");
+  mkdirSync(dir, { recursive: true });
+  const tablas = (await db.all("SELECT table_name AS t FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' ORDER BY 1")).map(
+    (r) => String(r.t),
+  );
+  const datos: Record<string, unknown[]> = {};
+  for (const t of tablas) datos[t] = await db.all(`SELECT * FROM "${t.replace(/"/g, '""')}"`);
+  const file = join(dir, `respaldo-${new Date().toISOString().replace(/[:.]/g, "-")}-descarga.json`);
+  await Bun.write(file, JSON.stringify({ formato: "kromo-respaldo", version: 1, creado: new Date().toISOString(), tablas: datos }));
+  return file;
 }
 
 /** Revisión rápida de integridad / conectividad. */

@@ -1,17 +1,23 @@
-# Postgres local para desarrollo y pruebas del modo Postgres.
-# Uso: docker compose up -d   →   DATABASE_URL=postgres://kromo:kromo@127.0.0.1:55440/kromo
+# Kromo Cargo en tu computadora con Docker.
+#   docker compose up -d       → abre http://localhost:8090 y crea tu cuenta (usuario y contraseña).
+#   docker compose down        → la detiene (tus datos se quedan en el volumen kromo-datos).
+#   git pull && docker compose up -d --build   → actualiza.
+# La IA de escritorio se conecta con: docker exec -i kromo-cargo kromo-cargo mcp  (ver Ajustes → Conectar IA).
+name: kromo
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: kromo-pg
-    environment:
-      POSTGRES_USER: kromo
-      POSTGRES_PASSWORD: kromo
-      POSTGRES_DB: kromo
+  kromo-cargo:
+    build: .
+    image: kromo-cargo:local
+    container_name: kromo-cargo
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:55440:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kromo"]
-      interval: 2s
-      timeout: 3s
-      retries: 20
+      # Solo en esta computadora. Para usarla en otros equipos de la red, quita "127.0.0.1:".
+      - "127.0.0.1:${KROMO_PUERTO:-8090}:8080"
+    environment:
+      KROMO_URL_PUBLICA: http://localhost:${KROMO_PUERTO:-8090}
+      TZ: ${TZ:-America/Mexico_City}
+    volumes:
+      - kromo-datos:/data
+
+volumes:
+  kromo-datos:

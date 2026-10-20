@@ -1,0 +1,17 @@
+# Postgres local para desarrollo y pruebas del modo Postgres.
+# Uso: bun run db:up  (docker compose -f docker-compose.pg.yml up -d)  →   DATABASE_URL=postgres://kromo:kromo@127.0.0.1:55440/kromo
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: kromo-pg
+    environment:
+      POSTGRES_USER: kromo
+      POSTGRES_PASSWORD: kromo
+      POSTGRES_DB: kromo
+    ports:
+      - "127.0.0.1:55440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kromo"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

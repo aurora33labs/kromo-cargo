@@ -37,6 +37,7 @@ Tienes acceso al MCP `kromo-cargo`. La misma base la usa el personal en la app (
 
 ### Cierre del día / reporte
 `reporte_ventas` con `desde` y `hasta` = hoy; luego por `producto`. Menciona ticket promedio, utilidad estimada y lo más vendido. Si hay productos por agotarse, dilo al final.
+Para mandar las ventas o el historial a Excel o a su contador: `exportar_ventas` (rango de fechas) o `exportar_historial`. Ambas regresan un enlace al CSV.
 
 ### Conteo físico
 `ajustar_stock` con `tipo: "conteo"` y `stock_real`. Para muchos productos, sugiere exportar (`exportar_productos`), contar en Excel e importar (`importar_productos`): la columna de existencias se toma como conteo.

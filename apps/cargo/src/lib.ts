@@ -170,3 +170,12 @@ export async function insertProducto(db: Db, d: Record<string, any>): Promise<nu
 }
 
 export const fechaSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Usa el formato AAAA-MM-DD");
+
+/** CSV listo para Excel (BOM para acentos, CRLF). */
+export function aCsv(cols: readonly string[], filas: Record<string, unknown>[]): string {
+  const esc = (v: unknown) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return "﻿" + [cols.join(","), ...filas.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\r\n");
+}

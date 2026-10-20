@@ -46,22 +46,24 @@ describe("API local", () => {
     expect(r.status).toBe(403);
   });
 
-  test("con PIN activo exige sesión y aplica el rol", async () => {
-    await post("guardar_usuario", { nombre: "Lupe", rol: "dueno", pin: "1234" });
-    await post("guardar_usuario", { nombre: "Beto", rol: "empleado", pin: "5555" });
+  test("con inicio de sesión activo exige sesión y aplica el rol", async () => {
+    expect((await post("configurar_negocio", { requerir_pin: true })).error).toContain("contraseña");
+    expect((await post("guardar_usuario", { nombre: "Lupe", rol: "dueno", pin: "1234" })).error).toContain("usuario y contraseña");
+    await post("guardar_usuario", { nombre: "Lupe", usuario: "lupe", contrasena: "lupe-1234", rol: "dueno", pin: "1234" });
+    await post("guardar_usuario", { nombre: "Beto", usuario: "beto", contrasena: "beto-5555", rol: "empleado" });
     await post("configurar_negocio", { requerir_pin: true });
     const sin = await fetch(`${base}/api/acciones/resumen`, { method: "POST", headers: H });
     expect(sin.status).toBe(401);
-    const mal = await fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin: "0000" }) });
-    expect(mal.status).toBe(401);
-    const login = await fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin: "5555" }) });
+    const entrar = (usuario: string, contrasena: string) => fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ usuario, contrasena }) });
+    expect((await entrar("beto", "otra-cosa")).status).toBe(401);
+    const login = await entrar("BETO", "beto-5555");
     const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
     expect(login.headers.get("set-cookie")).toContain("HttpOnly");
     const auth = { ...H, cookie };
     expect((await post("resumen", {}, auth)).ok).toBe(true);
     const r = await post("configurar_negocio", { requerir_pin: false }, auth);
     expect(r.error).toContain("rol");
-    const l2 = await fetch(`${base}/api/sesion`, { method: "POST", headers: H, body: JSON.stringify({ pin: "1234" }) });
+    const l2 = await entrar("lupe", "lupe-1234");
     const c2 = l2.headers.get("set-cookie")!.split(";")[0]!;
     expect((await post("configurar_negocio", { requerir_pin: false }, { ...H, cookie: c2 })).ok).toBe(true);
   });

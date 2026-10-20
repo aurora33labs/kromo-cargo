@@ -13,7 +13,20 @@
 | Registro MCP | Claude Code (`claude mcp add --scope user`), Codex (`codex mcp add`), `~/.gemini/settings.json`, `claude_desktop_config.json`. Antes de editar un JSON se guarda un respaldo junto al original |
 | Skill de uso | `~/.claude/skills/kromo-cargo/` y `~/.codex/skills/kromo-cargo/` (si esas carpetas existen) |
 
-El código es abierto y cada release publica `checksums.txt` (SHA-256). El instalador aborta si el checksum no coincide.
+El código está a la vista y cada release publica `checksums.txt` (SHA-256). El instalador aborta si el checksum no coincide.
+
+> **¿La persona ya usa Docker o prefiere no instalar nada en el sistema?** Ofrécele la ruta con Docker en lugar de los pasos 1 a 3:
+>
+> ```sh
+> git clone https://github.com/aurora33labs/kromo-cargo && cd kromo-cargo
+> docker compose up -d
+> ```
+>
+> Después:
+> 1. Abre http://localhost:8090. La primera vez pide crear la cuenta del dueño (usuario y contraseña).
+> 2. Para conectar Claude de escritorio o Claude Code, usa el comando `docker exec -i kromo-cargo kromo-cargo mcp`. La configuración exacta está en la app, en **Ajustes → Conectar IA**. Muéstrasela y pide confirmación antes de editar `claude_desktop_config.json`.
+>
+> Los datos quedan en el volumen de Docker `kromo-datos`.
 
 ---
 

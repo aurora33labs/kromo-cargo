@@ -11,7 +11,9 @@ import { ahora, type Db } from "./db.ts";
  */
 
 export const COOKIE_SESION = "kromo_sesion";
+export const COOKIE_EQUIPO = "kromo_equipo";
 const SESION_TTL_MS = 12 * 60 * 60 * 1000;
+const EQUIPO_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CODIGO_TTL_MS = 10 * 60 * 1000;
 const ACCESS_TTL_S = 60 * 60;
 const REFRESH_TTL_MS = 60 * 24 * 60 * 60 * 1000;
@@ -30,7 +32,7 @@ export interface Identidad {
 }
 
 /**
- * Frena ataques de fuerza bruta contra el PIN: por IP y global. El límite global no aplica a las IP
+ * Frena ataques de fuerza bruta contra la contraseña y el PIN: por IP y global. El límite global no aplica a las IP
  * que ya entraron con éxito, para que un ataque desde muchas IP no deje fuera al personal de la tienda.
  */
 export class Limitador {
@@ -65,13 +67,13 @@ export class Limitador {
 
 export interface AuthOptions {
   db: Db;
-  /** URL pública del servidor, sin "/" final (p. ej. https://mi-tienda.up.railway.app). */
-  urlPublica: string;
+  /** URL pública del servidor, sin "/" final (p. ej. https://mi-tienda.up.railway.app). Función si puede cambiar (dominio propio). */
+  urlPublica: string | (() => string);
   nombreApp: string;
   /** SVG inline del logo de la app para las páginas de autorización (opcional). */
   logoSvg?: string;
-  /** Verifica un PIN y regresa la identidad, o null. */
-  verificarPin: (pin: string) => Promise<Identidad | null>;
+  /** Verifica usuario y contraseña y regresa la identidad, o null. */
+  verificarCredenciales: (usuario: string, contrasena: string) => Promise<Identidad | null>;
   limitador?: Limitador;
 }
 
@@ -84,11 +86,14 @@ export class Auth {
     this.limitador = o.limitador ?? new Limitador();
   }
 
+  get url(): string {
+    return typeof this.o.urlPublica === "function" ? this.o.urlPublica() : this.o.urlPublica;
+  }
   get recursoMcp() {
-    return `${this.o.urlPublica}/mcp`;
+    return `${this.url}/mcp`;
   }
   get metadataRecurso() {
-    return `${this.o.urlPublica}/.well-known/oauth-protected-resource`;
+    return `${this.url}/.well-known/oauth-protected-resource`;
   }
 
   // ── Sesiones de la UI ──────────────────────────────────────────────
@@ -120,9 +125,44 @@ export class Auth {
   }
 
   cookieSesion(token: string | null): string {
-    const seguro = this.o.urlPublica.startsWith("https://") ? "; Secure" : "";
-    if (!token) return `${COOKIE_SESION}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${seguro}`;
-    return `${COOKIE_SESION}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESION_TTL_MS / 1000}${seguro}`;
+    return this.cookie(COOKIE_SESION, token, SESION_TTL_MS);
+  }
+
+  private cookie(nombre: string, token: string | null, ttlMs: number): string {
+    const seguro = this.url.startsWith("https://") ? "; Secure" : "";
+    if (!token) return `${nombre}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${seguro}`;
+    return `${nombre}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${ttlMs / 1000}${seguro}`;
+  }
+
+  // ── Equipos de confianza (cambio de cajero con PIN) ───────────────
+
+  /** Marca este navegador como equipo de la tienda: alguien entró aquí con usuario y contraseña. */
+  async crearEquipo(usuario: string): Promise<string> {
+    const token = aleatorio();
+    await this.o.db.run("DELETE FROM equipos WHERE expira < ?", [Date.now()]);
+    await this.o.db.run("INSERT INTO equipos (token_hash, usuario, expira, creado_en) VALUES (?, ?, ?, ?)", [
+      sha256(token),
+      usuario,
+      Date.now() + EQUIPO_TTL_MS,
+      ahora(),
+    ]);
+    return token;
+  }
+
+  async equipoValido(req: Request): Promise<boolean> {
+    const token = leerCookie(req, COOKIE_EQUIPO);
+    if (!token) return false;
+    const e = await this.o.db.get("SELECT expira FROM equipos WHERE token_hash = ?", [sha256(token)]);
+    return !!e && Number(e.expira) > Date.now();
+  }
+
+  async olvidarEquipo(req: Request) {
+    const token = leerCookie(req, COOKIE_EQUIPO);
+    if (token) await this.o.db.run("DELETE FROM equipos WHERE token_hash = ?", [sha256(token)]);
+  }
+
+  cookieEquipo(token: string | null): string {
+    return this.cookie(COOKIE_EQUIPO, token, EQUIPO_TTL_MS);
   }
 
   // ── Tokens Bearer (IA remota) ─────────────────────────────────────
@@ -172,14 +212,14 @@ export class Auth {
     if (req.method === "GET" && p.startsWith("/.well-known/oauth-protected-resource")) {
       return jsonCors({
         resource: this.recursoMcp,
-        authorization_servers: [this.o.urlPublica],
+        authorization_servers: [this.url],
         scopes_supported: [SCOPE],
         bearer_methods_supported: ["header"],
         resource_name: this.o.nombreApp,
       });
     }
     if (req.method === "GET" && (p === "/.well-known/oauth-authorization-server" || p === "/.well-known/openid-configuration")) {
-      const u = this.o.urlPublica;
+      const u = this.url;
       return jsonCors({
         issuer: u,
         authorization_endpoint: `${u}/oauth/autorizar`,
@@ -250,11 +290,14 @@ export class Auth {
     if (this.limitador.bloqueado(ip)) {
       return html(paginaAutorizar(this.marca, v.client.nombre, v.redirect, form, "Demasiados intentos. Espera unos minutos."), 429);
     }
-    const id = await this.o.verificarPin(form.get("pin") ?? "");
+    const id = await this.o.verificarCredenciales(form.get("usuario") ?? "", form.get("contrasena") ?? "");
     if (!id || id.rol !== "dueno") {
       this.limitador.fallo(ip);
       await Bun.sleep(300);
-      return html(paginaAutorizar(this.marca, v.client.nombre, v.redirect, form, id ? "Solo un dueño puede conectar una IA." : "PIN incorrecto."), 401);
+      return html(
+        paginaAutorizar(this.marca, v.client.nombre, v.redirect, form, id ? "Solo un dueño puede conectar una IA." : "Usuario o contraseña incorrectos."),
+        401,
+      );
     }
     this.limitador.exito(ip);
     const codigo = aleatorio();
@@ -442,7 +485,8 @@ const ESTILO = `
   .c{background:var(--s);border:1px solid var(--b);border-radius:1.25rem;box-shadow:0 8px 20px hsl(0 0% 0%/.05);padding:1.75rem;width:min(26rem,100%);display:grid;gap:1rem}
   .logo{width:3rem;height:3rem}.logo svg{display:block;width:100%;height:100%}h1{font-size:1.25rem;margin:0;line-height:1.3}p{margin:0;color:var(--t2)}b{color:var(--t)}
   label{font-size:.875rem;font-weight:600}
-  input{min-height:3.25rem;font-size:1.5rem;letter-spacing:.4em;text-align:center;border:1px solid var(--bi);border-radius:.75rem;background:var(--s);color:var(--t);width:100%}
+  input{min-height:2.75rem;font:inherit;padding:0 .75rem;border:1px solid var(--bi);border-radius:.75rem;background:var(--s);color:var(--t);width:100%}
+  .f{display:grid;gap:.375rem}
   :focus-visible{outline:3px solid var(--f);outline-offset:2px}
   .r{display:flex;gap:.625rem;flex-wrap:wrap}button{flex:1 1 8rem;min-height:2.75rem;border-radius:.75rem;border:1px solid var(--bi);background:var(--s);color:var(--t);font-family:inherit;font-size:1rem;font-weight:600;cursor:pointer}
   button.p{background:var(--a);border-color:var(--a);color:var(--oa)}.e{color:var(--bad);font-weight:600}ul{margin:0;padding-left:1.25rem;color:var(--t2)}`;
@@ -470,9 +514,12 @@ ${logoHtml(m)}
 ${conocido ? "" : `<p class="e">${esc(destino)} no es Claude ni ChatGPT. Permite solo si tú iniciaste esta conexión desde esa aplicación.</p>`}
 <ul><li>Consultar productos, ventas y reportes</li><li>Registrar ventas, entradas y ajustes</li><li>Cambiar precios (siempre con vista previa)</li></ul>
 <p>Todo queda en el historial y puedes revocar el acceso cuando quieras.</p>
-${error ? `<p class="e" role="alert" id="pin-error">${esc(error)}</p>` : ""}
-<label for="pin">PIN de dueño</label>
-<input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" autofocus maxlength="12"${error ? ' aria-invalid="true" aria-describedby="pin-error"' : ""}>
+${error ? `<p class="e" role="alert" id="acceso-error">${esc(error)}</p>` : ""}
+<p>Entra con tu usuario de dueño para permitirlo.</p>
+<div class="f"><label for="usuario">Usuario</label>
+<input id="usuario" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required maxlength="40" value="${esc(params.get("usuario") ?? "")}"${error ? ' aria-describedby="acceso-error"' : ""}></div>
+<div class="f"><label for="contrasena">Contraseña</label>
+<input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required maxlength="200"${error ? ' aria-invalid="true" aria-describedby="acceso-error"' : ""}></div>
 <div class="r"><button name="accion" value="cancelar" formnovalidate>Cancelar</button><button class="p" name="accion" value="permitir">Permitir</button></div>
 </form></main></body></html>`;
 }

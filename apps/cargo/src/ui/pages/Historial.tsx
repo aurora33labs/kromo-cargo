@@ -15,6 +15,16 @@ export function Historial() {
         <h1>Historial</h1>
         <div className="page-actions">
           <label className="check"><input type="checkbox" checked={soloIa} onChange={(e) => setSoloIa(e.target.checked)} /> Solo lo que hizo la IA</label>
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              const r = await run("exportar_historial", {}, { exito: (x) => `Se exportaron ${x.registros} registros` });
+              if (r?.url) location.assign(r.url);
+            }}
+          >
+            <Icon name="download" /> Exportar CSV
+          </button>
         </div>
       </div>
       <div className="card table-wrap cq" tabIndex={0} role="region" aria-label="Actividad">
